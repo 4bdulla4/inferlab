@@ -1,0 +1,236 @@
+import type { DataSource } from "@shared/llm";
+
+export const LLM_STAGE_IDS = [
+  "input",
+  "request",
+  "tokenization",
+  "tokenIds",
+  "tokenCount",
+  "embeddings",
+  "positional",
+  "transformer",
+  "attention",
+  "mlp",
+  "thinking",
+  "reasoning",
+  "logits",
+  "probabilities",
+  "tokenSelection",
+  "nextToken",
+  "loop",
+  "detokenization",
+  "response",
+] as const;
+
+export type LLMStageId = (typeof LLM_STAGE_IDS)[number];
+
+export interface StageDefinition {
+  id: LLMStageId;
+  label: string;
+  shortLabel: string;
+  /** Where the data shown in this stage normally comes from. */
+  defaultSource: DataSource;
+  /** One-line summary shown under the node. */
+  caption: string;
+  beginner: string;
+  advanced: string;
+  /** Sentence explaining what is LIVE vs SIMULATED in this stage. */
+  sourceNote: string;
+}
+
+export const LLM_STAGES: Record<LLMStageId, StageDefinition> = {
+  input: {
+    id: "input",
+    label: "User Input",
+    shortLabel: "Input",
+    defaultSource: "live",
+    caption: "Message received",
+    beginner: "Your message is captured exactly as you typed it. Nothing has been sent to the model yet.",
+    advanced: "The raw UTF-8 string is captured by the application layer. Character count and timestamp are recorded before any provider-specific processing.",
+    sourceNote: "The message text, character count and timestamp are real application events.",
+  },
+  request: {
+    id: "request",
+    label: "Request Preparation",
+    shortLabel: "Request",
+    defaultSource: "live",
+    caption: "Provider, model, settings",
+    beginner: "The app packages your message with a system instruction and settings such as the maximum answer length, then picks which provider and model to call.",
+    advanced: "The backend assembles the provider-specific request: model id, system prompt, message array, max output tokens, sampling parameters (when the model accepts them), and any provider features such as streaming or log probabilities.",
+    sourceNote: "This is the actual request the backend sends. Parameters the model rejects are omitted and reported.",
+  },
+  tokenization: {
+    id: "tokenization",
+    label: "Tokenization",
+    shortLabel: "Tokens",
+    defaultSource: "simulation",
+    caption: "Text → tokens",
+    beginner: "The text is split into small pieces called tokens. A token is often a word or part of a word, including the space in front of it.",
+    advanced: "A byte-pair-encoding (BPE) tokenizer greedily merges byte sequences into vocabulary entries. Common words become single tokens; rare words split into several sub-word pieces.",
+    sourceNote: "OpenAI publishes its tokenizer, so those tokens are exact. Claude's tokenizer is private, so its tokens are approximated with an open BPE and labeled as such.",
+  },
+  tokenCount: {
+    id: "tokenCount",
+    label: "Token Counting",
+    shortLabel: "Count",
+    defaultSource: "live",
+    caption: "Exact input size",
+    beginner: "Before sending, the app asks the provider exactly how many tokens the request will use.",
+    advanced: "Anthropic exposes POST /v1/messages/count_tokens, which returns the exact input token count for this request (system prompt, messages and tools) without running the model or billing output.",
+    sourceNote: "Live: the count comes from Anthropic's token-counting endpoint for this exact request.",
+  },
+  thinking: {
+    id: "thinking",
+    label: "Extended Thinking",
+    shortLabel: "Thinking",
+    defaultSource: "live",
+    caption: "Reasoning before answering",
+    beginner: "The model can think privately before it starts writing the answer. Claude can show a summary of that thinking.",
+    advanced: "With thinking: { type: \"adaptive\" } Claude decides how much to reason. The response carries thinking blocks; display: \"summarized\" returns a readable summary, while the raw chain of thought is never exposed. Depth is steered by output_config.effort.",
+    sourceNote: "Live when the model thinks: summarized thinking text streams from the API. The raw reasoning is never returned by any provider.",
+  },
+  reasoning: {
+    id: "reasoning",
+    label: "Reasoning Tokens",
+    shortLabel: "Reasoning",
+    defaultSource: "live",
+    caption: "Hidden, billed as output",
+    beginner: "The model thinks first using hidden tokens. You pay for them and they use up the answer budget, but you never see them.",
+    advanced: "OpenAI reasoning models generate internal reasoning tokens before the visible message. They are billed as output tokens and reported in usage.output_tokens_details.reasoning_tokens. reasoning.summary can return a readable summary; the underlying tokens stay hidden. Effort is set with reasoning.effort (none … max).",
+    sourceNote: "Live: the reasoning token count comes from the API usage report, and summaries stream as reasoning events when enabled.",
+  },
+  tokenIds: {
+    id: "tokenIds",
+    label: "Token IDs",
+    shortLabel: "IDs",
+    defaultSource: "simulation",
+    caption: "Vocabulary indices",
+    beginner: "Each token is looked up in a big dictionary and replaced by its number. The model only ever sees these numbers.",
+    advanced: "Each token maps to an integer index in the vocabulary (≈200k entries for o200k_base). The id sequence, not the text, is the model's input.",
+    sourceNote: "Ids are exact for OpenAI models. For Claude they come from an approximating tokenizer; the input token count, however, is reported live by the API.",
+  },
+  embeddings: {
+    id: "embeddings",
+    label: "Embeddings",
+    shortLabel: "Embed",
+    defaultSource: "simulation",
+    caption: "Ids → vectors",
+    beginner: "Every token number is turned into a long list of numbers (a vector). Tokens with similar meaning end up with similar lists.",
+    advanced: "An embedding matrix maps each token id to a dense d-model-dimensional vector. These learned vectors are the initial residual-stream representation for each position.",
+    sourceNote: "Proprietary models do not expose their embedding vectors. The vectors shown are a normalized educational visualization, not real weights.",
+  },
+  positional: {
+    id: "positional",
+    label: "Positional Information",
+    shortLabel: "Position",
+    defaultSource: "simulation",
+    caption: "Order matters",
+    beginner: "The model needs to know which token came first, second, third… so each token is tagged with its position in the sentence.",
+    advanced: "Transformers are permutation-invariant without positional signal. Architectures inject order via learned/sinusoidal position embeddings or rotary position encodings (RoPE) applied inside attention. The exact mechanism differs by model.",
+    sourceNote: "Conceptual visualization. The exact positional scheme of the selected proprietary model is not exposed.",
+  },
+  transformer: {
+    id: "transformer",
+    label: "Transformer",
+    shortLabel: "Transformer",
+    defaultSource: "simulation",
+    caption: "Stacked blocks",
+    beginner: "This is the model itself: many repeated layers that each mix information between tokens and then refine each token on its own.",
+    advanced: "A stack of N identical blocks. Each block applies multi-head self-attention followed by a position-wise feed-forward network, each wrapped in a residual connection with (pre-)layer normalization.",
+    sourceNote: "The request is genuinely sent to the provider here (live). Layer count and internals of the proprietary model are not exposed; the block view is conceptual.",
+  },
+  attention: {
+    id: "attention",
+    label: "Attention",
+    shortLabel: "Attention",
+    defaultSource: "simulation",
+    caption: "Tokens look at each other",
+    beginner: "Each token looks at the other tokens to decide which ones matter for understanding it. \"Blue\" pays attention to \"sky\".",
+    advanced: "Each position forms Query, Key and Value projections. Scaled dot-product scores softmax(QKᵀ/√d) weight the Values; heads run in parallel and are concatenated and projected back.",
+    sourceNote: "Educational attention simulation. Real attention weights are not returned by the Claude or OpenAI APIs.",
+  },
+  mlp: {
+    id: "mlp",
+    label: "MLP / Feed Forward",
+    shortLabel: "MLP",
+    defaultSource: "simulation",
+    caption: "Per-token refinement",
+    beginner: "After looking around, each token is processed on its own through a small neural network that sharpens what it has learned.",
+    advanced: "A two-layer position-wise network: linear up-projection (often 4× d-model), non-linearity (GELU/SwiGLU), linear down-projection. Applied independently at every position.",
+    sourceNote: "Conceptual visualization; internal activations of the proprietary model are not exposed.",
+  },
+  logits: {
+    id: "logits",
+    label: "Logits",
+    shortLabel: "Logits",
+    defaultSource: "simulation",
+    caption: "Scores per candidate",
+    beginner: "The model produces a score for every possible next token in its dictionary. Higher score = more likely.",
+    advanced: "The final residual-stream vector is projected by the unembedding matrix into a vocabulary-sized vector of raw scores (logits), one per token id.",
+    sourceNote: "When the OpenAI API returns log probabilities, the candidates shown are real. Otherwise they are an educational simulation.",
+  },
+  probabilities: {
+    id: "probabilities",
+    label: "Probabilities",
+    shortLabel: "Probs",
+    defaultSource: "simulation",
+    caption: "Softmax distribution",
+    beginner: "The scores are converted into percentages that add up to 100%, so the model knows how confident it is in each option.",
+    advanced: "softmax(logits / T) yields a probability distribution over the vocabulary. Temperature T flattens or sharpens it; top-p / top-k truncate the tail before sampling.",
+    sourceNote: "Live when the provider returns logprobs (OpenAI); otherwise simulated.",
+  },
+  tokenSelection: {
+    id: "tokenSelection",
+    label: "Token Selection",
+    shortLabel: "Select",
+    defaultSource: "live",
+    caption: "Sample or argmax",
+    beginner: "One token is picked from the options — usually a likely one, but not always the top one, which is what makes answers varied.",
+    advanced: "A decoding strategy (greedy argmax, temperature sampling, nucleus sampling…) draws one token id from the distribution.",
+    sourceNote: "The selected token is the real streamed output. The alternatives it was chosen over are live only when logprobs are available.",
+  },
+  nextToken: {
+    id: "nextToken",
+    label: "Next Token",
+    shortLabel: "Next",
+    defaultSource: "live",
+    caption: "Streamed to you",
+    beginner: "The chosen token is sent back to the app immediately, which is why answers appear word by word.",
+    advanced: "The provider streams the token (or a small chunk of tokens) as a server-sent event before generating the next one.",
+    sourceNote: "Real streamed output. Claude streams text chunks that may contain several tokens; OpenAI with logprobs streams exact tokens.",
+  },
+  loop: {
+    id: "loop",
+    label: "Repeat Generation",
+    shortLabel: "Loop",
+    defaultSource: "live",
+    caption: "Autoregressive loop",
+    beginner: "The new token is added to the end of the text, and the whole process runs again to pick the next one — until the model decides it is done.",
+    advanced: "Autoregressive decoding: the selected token is appended to the context and the model is run again (with KV-cache reuse) to predict position t+1, until an end-of-sequence token or the max-token limit.",
+    sourceNote: "Step count and timing are live. The loop is executed on the provider's servers; the visualization is conceptual.",
+  },
+  detokenization: {
+    id: "detokenization",
+    label: "Detokenization",
+    shortLabel: "Detok",
+    defaultSource: "simulation",
+    caption: "Tokens → text",
+    beginner: "All the generated tokens are glued back together into normal readable text.",
+    advanced: "Token ids are mapped back through the vocabulary to byte sequences and decoded as UTF-8. This happens provider-side; the API already returns text.",
+    sourceNote: "Conceptual stage. The API delivers text, so the token→text step is visualized rather than observed.",
+  },
+  response: {
+    id: "response",
+    label: "Final Response",
+    shortLabel: "Response",
+    defaultSource: "live",
+    caption: "Answer + usage",
+    beginner: "Here is the finished answer, together with how long it took and how many tokens were used.",
+    advanced: "Completion metadata: finish reason, latency, time-to-first-token, generation time, and the provider's authoritative usage report.",
+    sourceNote: "Everything in this stage is live provider data.",
+  },
+};
+
+export function stageDef(id: LLMStageId): StageDefinition {
+  return LLM_STAGES[id];
+}

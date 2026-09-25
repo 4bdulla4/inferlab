@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+
+# build output
+dist
+*.tsbuildinfo
+
+# secrets — never commit real keys
+.env
+.env.*
+!.env.example
+
+# runtime data (activity log, caches)
+.data
+
+# tooling
+coverage
+*.log
+.DS_Store
+.vscode
+.idea

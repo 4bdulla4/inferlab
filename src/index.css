@@ -1,0 +1,310 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-bg: #070910;
+  --color-bg-elevated: #0b0e17;
+  --color-panel: rgba(255, 255, 255, 0.03);
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+
+  --color-ink: #e6e8ef;
+  --color-ink-dim: #b4b8c5;
+  --color-muted: #7d8394;
+  --color-faint: #4c5163;
+
+  --color-accent: #8e2dff;
+  --color-accent-soft: #b57dff;
+  --color-live: #22d3ee;
+  --color-sim: #a78bfa;
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-err: #f87171;
+  --color-queued: #64748b;
+
+  --shadow-glow-live: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 22px rgba(34, 211, 238, 0.18);
+  --shadow-glow-sim: 0 0 0 1px rgba(167, 139, 250, 0.4), 0 0 22px rgba(142, 45, 255, 0.22);
+  --shadow-glow-ok: 0 0 0 1px rgba(52, 211, 153, 0.35), 0 0 16px rgba(52, 211, 153, 0.12);
+  --shadow-glow-err: 0 0 0 1px rgba(248, 113, 113, 0.45), 0 0 18px rgba(248, 113, 113, 0.2);
+
+  --animate-pulse-ring: pulse-ring 1.6s ease-out infinite;
+  --animate-dash: dash-flow 1.2s linear infinite;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-fade-up: fade-up 0.35s ease-out;
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.45); }
+    100% { box-shadow: 0 0 0 10px rgba(167, 139, 250, 0); }
+  }
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -24; }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────
+   Applied when the user picks light, or when the system prefers light and no
+   explicit choice was made. Only the palette changes; every component reads
+   these tokens. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f5f6fa;
+  --color-bg-elevated: #ffffff;
+  --color-panel: rgba(15, 20, 35, 0.02);
+  --color-line: rgba(15, 20, 35, 0.1);
+  --color-line-strong: rgba(15, 20, 35, 0.18);
+
+  --color-ink: #10131c;
+  --color-ink-dim: #39415a;
+  --color-muted: #5d6679;
+  --color-faint: #8b93a6;
+
+  --color-accent: #7c22ce;
+  --color-accent-soft: #9333ea;
+  --color-live: #0e7490;
+  --color-sim: #6d28d9;
+  --color-ok: #047857;
+  --color-warn: #b45309;
+  --color-err: #be123c;
+  --color-queued: #64748b;
+
+  --shadow-glow-live: 0 0 0 1px rgba(14, 116, 144, 0.35), 0 0 18px rgba(14, 116, 144, 0.12);
+  --shadow-glow-sim: 0 0 0 1px rgba(109, 40, 217, 0.35), 0 0 18px rgba(124, 34, 206, 0.12);
+  --shadow-glow-ok: 0 0 0 1px rgba(4, 120, 87, 0.3), 0 0 14px rgba(4, 120, 87, 0.1);
+  --shadow-glow-err: 0 0 0 1px rgba(190, 18, 60, 0.4), 0 0 16px rgba(190, 18, 60, 0.14);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background-image:
+    radial-gradient(1200px 600px at 20% -10%, var(--bg-glow-a), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, var(--bg-glow-b), transparent 60%),
+    linear-gradient(var(--bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
+  background-attachment: fixed;
+}
+
+:root {
+  --bg-glow-a: rgba(142, 45, 255, 0.12);
+  --bg-glow-b: rgba(34, 211, 238, 0.07);
+  --bg-grid: rgba(255, 255, 255, 0.025);
+  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)), rgba(11, 14, 23, 0.72);
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.35);
+  --scroll-thumb: rgba(255, 255, 255, 0.16);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.3);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.1);
+  --popover-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  --appbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="light"] {
+  --bg-glow-a: rgba(124, 34, 206, 0.07);
+  --bg-glow-b: rgba(14, 116, 144, 0.05);
+  --bg-grid: rgba(15, 20, 35, 0.04);
+  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.75)), #ffffff;
+  --panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 30px rgba(15, 20, 35, 0.08);
+  --scroll-thumb: rgba(15, 20, 35, 0.2);
+  --scroll-thumb-hover: rgba(15, 20, 35, 0.34);
+  --surface-hover: rgba(15, 20, 35, 0.04);
+  --surface-1: rgba(15, 20, 35, 0.03);
+  --surface-2: rgba(15, 20, 35, 0.055);
+  --surface-3: rgba(15, 20, 35, 0.09);
+  --popover-shadow: 0 18px 40px rgba(15, 20, 35, 0.18);
+  --appbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 20px rgba(15, 20, 35, 0.07);
+}
+
+/* Tinted fills that follow the theme: on dark they lighten, on light they
+   darken. Components use these instead of white-alpha, which would vanish
+   against a light background. */
+@utility surface-1 { background-color: var(--surface-1); }
+@utility surface-2 { background-color: var(--surface-2); }
+@utility surface-3 { background-color: var(--surface-3); }
+@utility surface-hover { background-color: var(--surface-hover); }
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Firefox has no ::-webkit-scrollbar; give it the thin styled scrollbar instead. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
+
+/* Keyboard focus is shown in the brand accent. Cyan is reserved for marking
+   live provider data, so using it here read as a state rather than as focus. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-soft);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Glass panel primitive */
+.glass {
+  background: var(--panel-bg);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/*
+   Chrome that floats over arbitrary content is opaque. A 72%-transparent panel
+   is fine over the page background, but a menu or a sticky bar sitting on top of
+   dense text stays unreadable however much it is blurred.
+*/
+.popover {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-line-strong);
+  box-shadow: var(--popover-shadow);
+}
+
+.appbar {
+  background-color: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-line);
+  box-shadow: var(--appbar-shadow);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.label-caps {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, var(--color-muted) 0%, var(--color-ink) 50%, var(--color-muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+/* Panels that scroll keep a visible gutter, so it is obvious more content follows.
+   macOS overlay scrollbars are hidden until you scroll, which makes clipped
+   content look permanently cut off. */
+.panel-scroll {
+  scrollbar-gutter: stable;
+}
+.panel-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Pipeline node text scales with the diagram */
+.pipeline-scale {
+  --scale: 1;
+}
+
+.range-input {
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent) var(--fill, 50%), rgba(255, 255, 255, 0.12) var(--fill, 50%));
+  outline: none;
+}
+.range-input::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--color-accent);
+  cursor: pointer;
+}
+.range-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--color-accent);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-system * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.motion-reduced * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Agent graph: a dotted canvas so panning reads as moving over a surface, and a
+   sweeping bar along the bottom of a node while its tool is still running. */
+.agent-canvas {
+  background-color: var(--color-bg-elevated);
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.agent-sweep {
+  background: linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%);
+  background-size: 45% 100%;
+  background-repeat: no-repeat;
+  animation: agent-sweep 1.2s ease-in-out infinite;
+  opacity: 0.85;
+}
+@keyframes agent-sweep {
+  0% { background-position: -50% 0; }
+  100% { background-position: 150% 0; }
+}

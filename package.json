@@ -1,0 +1,74 @@
+{
+  "name": "inferlab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Watch AI systems actually run: LLM requests, RAG retrieval, agent loops and machine-learning training, stage by stage, with real computation clearly separated from educational simulation.",
+  "license": "MIT",
+  "author": "Abdullah Ahmad",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4bdulla4/inferlab.git"
+  },
+  "homepage": "https://github.com/4bdulla4/inferlab#readme",
+  "bugs": {
+    "url": "https://github.com/4bdulla4/inferlab/issues"
+  },
+  "keywords": [
+    "llm",
+    "rag",
+    "agents",
+    "machine-learning",
+    "visualization",
+    "visualizer",
+    "education",
+    "explainable-ai",
+    "anthropic",
+    "openai",
+    "self-hosted",
+    "bring-your-own-key"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c cyan,magenta \"vite\" \"tsx watch server/index.ts\"",
+    "dev:web": "vite",
+    "dev:api": "tsx watch server/index.ts",
+    "build": "npm run typecheck && vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:api:mock": "LLM_MOCK_PROVIDER=on tsx watch server/index.ts",
+    "analyze": "tsx --tsconfig tsconfig.server.json scripts/analyze.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@google/genai": "^2.24.0",
+    "clsx": "^2.1.1",
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "gpt-tokenizer": "^4.0.0",
+    "lucide-react": "^1.47.0",
+    "mammoth": "^1.12.3",
+    "motion": "^13.4.1",
+    "openai": "^7.23.0",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}
