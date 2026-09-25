@@ -88,6 +88,85 @@ flag. The ML lab needs no key at all — it computes everything locally.
 
 ---
 
+## Installation
+
+### Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| **Node.js** | 22.12+, 24.x, or 26+ | Vite needs 22.12 or newer; Vitest supports only the even-numbered LTS lines, so Node 23 and 25 will not work. Check with `node -v`. |
+| **npm** | 10+ | Ships with Node. Yarn and pnpm work too. |
+| **git** | any | Only to clone. |
+
+No database, no Docker, no cloud account. An API key is optional — see step 3.
+
+### 1. Clone
+
+```bash
+git clone https://github.com/4bdulla4/inferlab.git
+cd inferlab
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and either add a provider key, or add neither and run offline:
+
+- **With a key** — set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`. Any one is enough;
+  the app enables the labs it can serve and tells you what is missing. You can also paste a key into
+  the in-app Settings drawer later instead of editing this file.
+- **Without a key** — set `LLM_MOCK_PROVIDER=on`. You get an offline provider that streams a canned
+  answer, clearly labelled as a simulation. The **ML lab needs no key at all**, because it computes
+  everything locally, so it is a good place to start.
+
+Every variable is documented under [Configuration](#configuration).
+
+### 4. Run
+
+```bash
+npm run dev
+```
+
+This starts both processes: the web app on **http://localhost:5173** and the API on **:8790**.
+Open the web address; the API is proxied under `/api` and you do not visit it directly.
+
+### 5. Verify
+
+Open http://localhost:5173, choose **ML** in the top navigation, keep the pre-selected flower
+dataset and press **RUN**. A model trains end to end with no key and no network, which confirms the
+install is sound. To check a provider key instead, use the **LLM** lab and press **RUN** there.
+
+### Running in production
+
+```bash
+npm run build      # typechecks all three projects, then bundles the client
+npm start          # one Node process serves dist/ and the API
+```
+
+`npm start` honours `API_PORT` and serves the built client from the same origin, so no proxy is
+needed.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `EADDRINUSE` on 5173 or 8790 | Something else holds the port. Set `API_PORT` in `.env` for the API; pass `--port` to Vite for the web app. |
+| The dataset panel is stuck on "connecting" | The API is not up yet or restarted. It retries for about 25 seconds, then shows a **Try again** button. |
+| Vitest refuses to start | You are on an odd-numbered Node release (23 or 25). Switch to 22, 24 or 26. |
+| A provider says the key is missing | `.env` is read at server start; restart `npm run dev` after editing it. Values in `.env` deliberately override any stale key exported in your shell. |
+| Rate limits in the GitHub Analyzer | Unauthenticated GitHub allows 60 requests/hour. Add `GITHUB_TOKEN` to raise it to 5,000. |
+
+---
+
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in what you need. Every value is optional; the app tells you
