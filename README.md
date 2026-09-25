@@ -14,6 +14,8 @@ cp .env.example .env      # add a key, or set LLM_MOCK_PROVIDER=on to run offlin
 npm run dev               # web on :5173, API on :8790
 ```
 
+![The LLM lab mid-run: a request flowing through input processing, tokenization, the transformer and the autoregressive loop, with each stage marked live or conceptual, beside the real streamed answer.](docs/screenshots/llm-lab.png)
+
 ---
 
 ## The honesty contract
@@ -62,6 +64,28 @@ If something cannot be observed honestly, it is labelled or it is not shown.
 Every lab shares one engine: an append-only event log, a playback controller (0.25×–4×, pause,
 single-step, replay), a pure reducer, and a provenance-tagged event envelope. Pausing the
 visualization never blocks the real work, and a replay redraws the identical run.
+
+### RAG
+
+Three bands: documents become vectors, a question finds its passages, and the passages become an
+answer whose every claim links back to the chunk it came from.
+
+![The RAG lab after a question: the ingestion, retrieval and generation bands all complete, with a cited answer and its two sources below.](docs/screenshots/rag-lab.png)
+
+### Agents
+
+The loop turn by turn, with real tool calls. Nothing here is a mock-up of reasoning: the graph shows
+only observable states, and the answer names the tools it actually used.
+
+![The Agents lab: a completed agent graph showing observation, planning, decision and final response nodes, with the real answer below naming the web search and clock tools it used.](docs/screenshots/agents-lab.png)
+
+### ML
+
+A model trains for real on your rows. The screenshot below is the honesty contract at its clearest:
+the feature importance is marked live because those are the fitted coefficients, while the decision
+surface beside it is marked a simulation and explains exactly what it simplified.
+
+![The ML lab after training: live feature importance beside a decision surface labelled as a 2-D slice, above the full four-band pipeline from ingestion to deployment.](docs/screenshots/ml-lab.png)
 
 ---
 
