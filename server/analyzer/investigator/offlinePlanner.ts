@@ -25,11 +25,16 @@ export class OfflineInvestigatorModel implements AgentModel {
   readonly model = "offline-investigator";
   private counter = 0;
 
-  constructor(private readonly analysis: RepoAnalysis, private readonly question: string) {}
+  /** `paced: false` skips the pauses that let a person watch the loop; tests use it. */
+  constructor(private readonly analysis: RepoAnalysis, private readonly question: string, private readonly opts: { paced?: boolean } = {}) {}
+
+  private pause(ms: number, signal: AbortSignal): Promise<void> {
+    return this.opts.paced === false ? Promise.resolve() : sleep(ms, signal);
+  }
 
   async complete(req: ModelTurnRequest): Promise<ModelTurn> {
     const sentAt = Date.now();
-    await sleep(300 + Math.round(Math.random() * 250), req.signal);
+    await this.pause(300 + Math.round(Math.random() * 250), req.signal);
     const round = req.messages.filter((m) => m.role === "assistant").length;
     const calls = req.forceText ? [] : this.plan(round, req.messages);
     let text = "";
@@ -39,7 +44,7 @@ export class OfflineInvestigatorModel implements AgentModel {
     } else {
       text = this.answer(req.messages);
       for (const piece of text.match(/\S+\s*/g) ?? []) {
-        await sleep(6, req.signal);
+        await this.pause(6, req.signal);
         req.onTextDelta?.(piece);
       }
     }

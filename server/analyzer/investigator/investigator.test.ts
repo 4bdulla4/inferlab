@@ -183,7 +183,7 @@ describe("investigateRepository", () => {
     const ws = new RepoWorkspace(analysis, contents, null);
     const events: AgentEvent[] = [];
     const question = "How does login create a session?";
-    const run = await investigateRepository({ runId: "t1", question, workspace: ws, model: new OfflineInvestigatorModel(analysis, question), emit: (e) => events.push(e), signal: new AbortController().signal });
+    const run = await investigateRepository({ runId: "t1", question, workspace: ws, model: new OfflineInvestigatorModel(analysis, question, { paced: false }), emit: (e) => events.push(e), signal: new AbortController().signal });
     const outcome = await run.done;
     expect(outcome.reason).toBe("completed");
     const tools = events.filter((e) => e.type === "tool_selected").map((e) => (e.type === "tool_selected" ? e.call.name : ""));
