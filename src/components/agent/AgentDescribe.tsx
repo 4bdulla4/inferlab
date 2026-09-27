@@ -135,7 +135,7 @@ export function AgentDescribe({ onOpenSettings }: { onOpenSettings: () => void }
               </p>
             </div>
             <span className="flex items-center gap-1.5 shrink-0">
-              {result.source === "ai+rules" ? <Badge tone="live">rules + {result.model ?? "model"}</Badge> : <Badge>rules only</Badge>}
+              {result.source === "ai+rules" ? <Badge tone="live">rules + model</Badge> : <Badge>rules only</Badge>}
               {stale ? <Badge tone="warn">description changed</Badge> : null}
             </span>
           </div>

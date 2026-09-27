@@ -254,7 +254,7 @@ function ReportView({ report }: { report: AgentBackendReport }) {
           <div className="rounded-lg border border-line surface-1 p-3 grid gap-1.5">
             <p className="label-caps flex items-center gap-2">
               Explanation
-              <Badge tone={report.narrative.source === "ai" ? "live" : "neutral"}>{report.narrative.source === "ai" ? `written by ${report.narrative.model ?? "the model"} from the findings` : "assembled from the findings"}</Badge>
+              <Badge tone={report.narrative.source === "ai" ? "live" : "neutral"}>{report.narrative.source === "ai" ? "written by the model from the findings" : "assembled from the findings"}</Badge>
             </p>
             <p className="text-[12.5px] leading-relaxed text-ink-dim whitespace-pre-wrap">{report.narrative.text}</p>
           </div>

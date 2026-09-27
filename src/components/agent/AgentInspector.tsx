@@ -197,7 +197,6 @@ function NodeFacts({ node, visual: v, call }: { node: AgentGraphNode; visual: Ag
       push("output tokens", it?.response?.usage?.outputTokens ?? undefined);
       push("stop reason", it?.response?.stopReason);
       push("tool calls", it?.response ? it.response.toolCalls.length : undefined);
-      push("model", it?.response?.model);
       break;
     case "decision":
       push("iteration", node.iteration);

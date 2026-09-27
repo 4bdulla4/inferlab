@@ -69,11 +69,10 @@ function AgentConfigBody() {
               aria-pressed={config.llmProvider === p.id}
               onClick={() => setConfig({ llmProvider: p.id as ProviderId })}
               className={cn("inline-flex h-8 items-center gap-2 rounded-lg border px-3 text-[12.5px]", config.llmProvider === p.id ? "border-accent bg-accent/10 text-ink" : "border-line text-ink-dim hover:border-line-strong hover:text-ink", !p.configured && "opacity-45 cursor-not-allowed")}
-              title={p.configured ? p.model : "Add a key in Settings"}
+              title={p.configured ? p.name : "Add a key in Settings"}
             >
               {p.mock ? <SourceDot source="simulation" /> : <SourceDot source="live" />}
               {p.name}
-              <span className="mono text-[10px] text-muted">{p.model}</span>
             </button>
           ))}
         </div>
