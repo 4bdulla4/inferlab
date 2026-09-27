@@ -254,3 +254,35 @@ describe("agent layout", () => {
     expect(band.y).toBeLessThan(v.nodes["plan-1"]!.y);
   });
 });
+
+describe("evidence check", () => {
+  it("adds an Evidence Check node between the answer and completion, keeping the answer's source", () => {
+    const events = script(true);
+    const completedAt = events.findIndex((e) => e.type === "run_completed");
+    events.splice(completedAt, 0, {
+      type: "evidence_checked",
+      at: 2800,
+      citations: [
+        { ref: "src/a.ts:3", file: "src/a.ts", startLine: 3, endLine: 3, status: "verified", note: "read" },
+        { ref: "src/b.ts:9", file: "src/b.ts", startLine: 9, endLine: 9, status: "unseen", note: "never opened" },
+      ],
+      verified: 1,
+      total: 2,
+    });
+    const { state } = play(events);
+    expect(state.evidence).toMatchObject({ verified: 1, total: 2 });
+    expect(state.nodes.find((n) => n.id === NODE_IDS.evidence)?.sublabel).toBe("1/2 citations verified");
+    expect(state.edges.some((e) => e.from === NODE_IDS.response && e.to === NODE_IDS.evidence)).toBe(true);
+    expect(state.edges.some((e) => e.from === NODE_IDS.evidence && e.to === NODE_IDS.done)).toBe(true);
+    expect(state.edges.some((e) => e.from === NODE_IDS.response && e.to === NODE_IDS.done)).toBe(false);
+    // The check is code, so its node is live; the offline planner's answer stays a simulation.
+    expect(state.nodeSource[NODE_IDS.evidence]).toBe("live");
+    expect(state.nodeSource[NODE_IDS.response]).toBe("simulation");
+  });
+
+  it("runs without an evidence node when no check was made", () => {
+    const { state } = play(script());
+    expect(state.nodes.some((n) => n.id === NODE_IDS.evidence)).toBe(false);
+    expect(state.edges.some((e) => e.from === NODE_IDS.response && e.to === NODE_IDS.done)).toBe(true);
+  });
+});

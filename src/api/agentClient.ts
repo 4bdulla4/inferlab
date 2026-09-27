@@ -1,5 +1,6 @@
 import type { AgentBlueprint, AgentEvent, AgentRunRecord, AgentServiceStatus, DescribeAgentBody, MemoryEntry, ResolveApprovalBody, StartAgentRunBody } from "@shared/agent";
 import type { AgentBackendReport, AnalyzeCodeBody, AnalyzeRepoBody } from "@shared/agentReport";
+import type { InvestigateRequestBody } from "@shared/repo";
 import { sessionHeaders } from "@/store/uiStore";
 import { ApiError, createSSEParser } from "./llmClient";
 
@@ -41,14 +42,27 @@ export async function clearAgentSession(sessionId: string): Promise<void> {
 
 /** Starts a run and streams its events until the server signals `end`. */
 export async function streamAgentRun(body: StartAgentRunBody, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<void> {
-  const res = await fetch("/api/agent/runs", {
+  await streamAgentEvents("/api/agent/runs", body, "The run could not start", onEvent, signal);
+}
+
+/** Starts the repository investigator; its run streams the same events as an agent run. */
+export async function streamInvestigation(body: InvestigateRequestBody, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<void> {
+  await streamAgentEvents("/api/repo/investigate", body, "The investigation could not start", onEvent, signal);
+}
+
+export async function stopInvestigation(runId: string): Promise<void> {
+  await fetch(`/api/repo/investigate/${encodeURIComponent(runId)}/stop`, { method: "POST" }).catch(() => {});
+}
+
+async function streamAgentEvents(url: string, body: unknown, failure: string, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<void> {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...sessionHeaders() },
     body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) {
-    let message = `The run could not start (${res.status})`;
+    let message = `${failure} (${res.status})`;
     try {
       const b = (await res.json()) as { error?: string };
       if (b.error) message = b.error;

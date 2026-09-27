@@ -21,6 +21,8 @@ export interface AnalyzeDeps {
   emit: (event: AnalyzeEvent) => void;
   signal: AbortSignal;
   skipAi?: boolean;
+  /** Receives the file texts the scan read, so the investigator can reuse them without downloading again. */
+  onContents?: (analysisId: string, contents: Map<string, string>) => void;
 }
 
 /** Runs the full pipeline: fetch → scan → graph → (optional) AI summaries. */
@@ -181,6 +183,8 @@ export async function analyzeRepository(url: string, deps: AnalyzeDeps): Promise
     ai: deps.ai.status(),
     warnings,
   };
+
+  deps.onContents?.(analysis.id, contents);
 
   // ── Optional AI pass ──
   if (deps.ai.status().available && !deps.skipAi) {

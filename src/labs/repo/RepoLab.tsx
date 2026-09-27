@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { GitBranch, Loader2 } from "lucide-react";
+import { agentRuntime } from "@/engine/agent/agentRuntime";
 import { useRepoStatus } from "@/hooks/useRepoStatus";
 import { useScrollOnRun } from "@/hooks/useScrollOnRun";
 import { useRepoStore } from "@/store/repoStore";
@@ -8,6 +9,7 @@ import { PanelGrid } from "@/components/layout/PanelGrid";
 import { ArchitectureDiagram } from "@/components/repo/ArchitectureDiagram";
 import { EvidenceBadge } from "@/components/repo/EvidenceBadge";
 import { FactsPanel } from "@/components/repo/FactsPanel";
+import { InvestigationPanel } from "@/components/repo/InvestigationPanel";
 import { OverviewPanel } from "@/components/repo/OverviewPanel";
 import { QuestionPanel } from "@/components/repo/QuestionPanel";
 import { RepoInput } from "@/components/repo/RepoInput";
@@ -15,7 +17,7 @@ import { RepoInspector } from "@/components/repo/RepoInspector";
 import { tracePlayer } from "./tracePlayer";
 
 const REPO_LAYOUT = [
-  ["repository", "overview", "diagram", "facts"],
+  ["repository", "overview", "diagram", "investigation", "facts"],
   ["question", "inspector"],
 ];
 
@@ -33,7 +35,22 @@ export function RepoLab() {
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
       if (e.key === "Escape") select(null);
-      const trace = useRepoStore.getState().trace;
+      const repo = useRepoStore.getState();
+      if (repo.askMode === "investigate" && repo.investigation) {
+        const id = repo.investigation.runId;
+        if (e.key === " ") {
+          e.preventDefault();
+          agentRuntime.toggle(id);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          agentRuntime.step(id);
+        } else if (e.key.toLowerCase() === "r") {
+          e.preventDefault();
+          agentRuntime.replay(id);
+        }
+        return;
+      }
+      const trace = repo.trace;
       if (!trace) return;
       if (e.key === " ") {
         e.preventDefault();
@@ -107,6 +124,7 @@ export function RepoLab() {
         )}
       </div>
     ),
+    investigation: analysis && !stale ? <InvestigationPanel /> : null,
     facts: analysis ? (
       <Stale stale={stale}>
         <FactsPanel analysis={analysis} />

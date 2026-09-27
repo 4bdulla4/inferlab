@@ -1,5 +1,41 @@
 import { create } from "zustand";
+import type { ProviderId } from "@shared/llm";
 import type { AnalyzeEvent, RepoAnalysis, RepoServiceStatus, SummarizeResult, TraceResult } from "@shared/repo";
+
+const ASK_PREFS_KEY = "inferlab.repo.ask.v1";
+
+/** "investigate" runs the agent over the code; "trace" is the one-shot answer from the index. */
+export type AskMode = "investigate" | "trace";
+
+export interface InvestigationRef {
+  /** Run id in the agent store, where its events and playback live. */
+  runId: string;
+  analysisId: string;
+  question: string;
+  provider: ProviderId;
+  startedAt: number;
+}
+
+function loadAskPrefs(): { mode: AskMode; provider: ProviderId | null } {
+  try {
+    const raw = window.localStorage.getItem(ASK_PREFS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as { mode?: AskMode; provider?: ProviderId | null };
+      return { mode: p.mode === "trace" ? "trace" : "investigate", provider: p.provider ?? null };
+    }
+  } catch {
+    /* fall through */
+  }
+  return { mode: "investigate", provider: null };
+}
+
+function saveAskPrefs(prefs: { mode: AskMode; provider: ProviderId | null }): void {
+  try {
+    window.localStorage.setItem(ASK_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* preference simply will not persist */
+  }
+}
 
 export type RepoStatus = "idle" | "analyzing" | "ready" | "error";
 
@@ -54,6 +90,15 @@ export interface RepoState {
   toggleCategory: (category: string) => void;
   clearCategoryFilter: () => void;
 
+  askMode: AskMode;
+  /** Provider for investigations; null picks the first configured one. */
+  investigatorProvider: ProviderId | null;
+  investigation: InvestigationRef | null;
+  investigationHistory: InvestigationRef[];
+  setAskMode: (mode: AskMode) => void;
+  setInvestigatorProvider: (provider: ProviderId) => void;
+  setInvestigation: (ref: InvestigationRef | null) => void;
+
   setQuestion: (q: string) => void;
   startAsk: () => void;
   finishAsk: (trace: TraceResult) => void;
@@ -99,6 +144,27 @@ export const useRepoStore = create<RepoState>((set) => ({
   traceHistory: [],
   traceCursor: -1,
   tracePlaying: false,
+  ...(() => {
+    const prefs = loadAskPrefs();
+    return { askMode: prefs.mode, investigatorProvider: prefs.provider };
+  })(),
+  investigation: null,
+  investigationHistory: [],
+  setAskMode: (askMode) =>
+    set((s) => {
+      saveAskPrefs({ mode: askMode, provider: s.investigatorProvider });
+      return { askMode };
+    }),
+  setInvestigatorProvider: (investigatorProvider) =>
+    set((s) => {
+      saveAskPrefs({ mode: s.askMode, provider: investigatorProvider });
+      return { investigatorProvider };
+    }),
+  setInvestigation: (investigation) =>
+    set((s) => ({
+      investigation,
+      investigationHistory: investigation && !s.investigationHistory.some((r) => r.runId === investigation.runId) ? [investigation, ...s.investigationHistory].slice(0, 12) : s.investigationHistory,
+    })),
 
   setUrl: (url) => set({ url }),
   setServiceStatus: (serviceStatus) => set({ serviceStatus }),
@@ -114,9 +180,9 @@ export const useRepoStore = create<RepoState>((set) => ({
   // Selections and traces point at node ids from the old graph, so they go when
   // the new one lands rather than when the scan starts.
   finishAnalysis: (analysis) =>
-    set({ analysis, status: "ready", progress: 1, error: null, selection: null, trace: null, traceHistory: [], traceCursor: -1, tracePlaying: false }),
+    set({ analysis, status: "ready", progress: 1, error: null, selection: null, trace: null, traceHistory: [], traceCursor: -1, tracePlaying: false, investigation: null, investigationHistory: [] }),
   failAnalysis: (message) => set({ status: "error", error: message }),
-  reset: () => set({ status: "idle", phases: [], progress: 0, error: null, analysis: null, selection: null, trace: null, traceHistory: [], traceCursor: -1, tracePlaying: false, askError: null, categoryFilter: null }),
+  reset: () => set({ status: "idle", phases: [], progress: 0, error: null, analysis: null, selection: null, trace: null, traceHistory: [], traceCursor: -1, tracePlaying: false, askError: null, categoryFilter: null, investigation: null, investigationHistory: [] }),
   select: (selection) => set({ selection }),
   setHovered: (hoveredNodeId) => set({ hoveredNodeId }),
   toggleCategory: (category) =>

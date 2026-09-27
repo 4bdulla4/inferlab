@@ -356,7 +356,25 @@ export type AgentEvent =
       state: AgentStateSnapshot;
     }
   | { type: "notice"; at: number; level: "info" | "warn"; message: string }
+  /** Code's check of every `path:line` the final answer cites (repository investigations only). */
+  | { type: "evidence_checked"; at: number; citations: EvidenceCitation[]; verified: number; total: number }
   | { type: "error"; at: number; message: string; status?: number; retryable: boolean };
+
+/**
+ * One citation from an investigator's answer, checked by code after the run:
+ *   - "verified"     the file exists, the lines exist, and a tool showed them to the agent
+ *   - "unseen"       the file exists but no tool result ever showed the agent those lines
+ *   - "out_of_range" the file exists but is shorter than the cited line
+ *   - "missing"      no such file in the repository
+ */
+export interface EvidenceCitation {
+  ref: string;
+  file: string;
+  startLine: number;
+  endLine: number;
+  status: "verified" | "unseen" | "out_of_range" | "missing";
+  note: string;
+}
 
 /* ───────────────────────────── blueprints ───────────────────────────── */
 

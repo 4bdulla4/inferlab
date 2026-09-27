@@ -69,6 +69,7 @@ export interface AgentStoreState {
   setServerRunId: (runId: string, serverRunId: string) => void;
   setActiveRun: (runId: string | null) => void;
   clearRuns: () => void;
+  removeRun: (runId: string) => void;
   setStarting: (starting: boolean, error?: string | null) => void;
 
   selectNode: (nodeId: string | null) => void;
@@ -171,6 +172,12 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
 
   setActiveRun: (activeRunId) => set({ activeRunId }),
   clearRuns: () => set({ runs: {}, activeRunId: null, selectedNodeId: null }),
+  removeRun: (runId) =>
+    set((s) => {
+      if (!s.runs[runId]) return s;
+      const { [runId]: _gone, ...runs } = s.runs;
+      return { runs, activeRunId: s.activeRunId === runId ? null : s.activeRunId };
+    }),
   setStarting: (starting, error = null) => set({ starting, startError: error }),
 
   selectNode: (selectedNodeId) => set({ selectedNodeId }),

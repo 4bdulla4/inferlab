@@ -1,8 +1,14 @@
 import { Router, type Request, type Response } from "express";
-import type { AnalyzeEvent, AnalyzeRequestBody, AskRequestBody, RepoServiceStatus, SummarizeRequestBody, SummarizeResult, TraceResult } from "@shared/repo";
+import type { AgentEvent } from "@shared/agent";
+import type { ProviderId } from "@shared/llm";
+import type { AnalyzeEvent, AnalyzeRequestBody, AskRequestBody, InvestigateRequestBody, RepoServiceStatus, SummarizeRequestBody, SummarizeResult, TraceResult } from "@shared/repo";
+import { createAgentModel } from "../agent/models";
+import type { RunOutcome } from "../agent/AgentRunner";
+import type { AgentModel } from "../agent/types";
 import { AiAnalyzer } from "../analyzer/ai";
 import { analyzeRepository, applySummary } from "../analyzer/analyzer";
-import { AnalysisCache } from "../analyzer/cache";
+import { AnalysisCache, ContentCache } from "../analyzer/cache";
+import { investigateRepository, OfflineInvestigatorModel, RepoWorkspace } from "../analyzer/investigator";
 import { GitHubClient, GitHubError } from "../analyzer/github";
 import { LIMITS } from "../analyzer/select";
 import { heuristicTrace } from "../analyzer/tracer";
@@ -10,11 +16,19 @@ import type { ServerConfig } from "../lib/config";
 import { friendlyApiError } from "../lib/apiErrors";
 import type { HistoryStore } from "../lib/history";
 import { readSessionKeys } from "../lib/sessionKeys";
+import { SSEWriter } from "../lib/sse";
+import { ProviderNotConfiguredError } from "../providers/types";
+import { sanitize } from "./llm";
+
+const INVESTIGATOR_PROVIDERS: ProviderId[] = ["claude", "openai", "gemini", "mock"];
 
 export function createRepoRouter(getConfig: () => ServerConfig, history?: HistoryStore): Router {
   const router = Router();
   const cache = new AnalysisCache();
+  const contents = new ContentCache();
+  const investigations = new Map<string, AbortController>();
   let traceCounter = 0;
+  let investigationCounter = 0;
   /** Per-request clients: current server config (re-read when .env changes) plus any session keys from the browser. */
   const clientsFor = (req: Request) => {
     const config = getConfig();
@@ -57,7 +71,7 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
     const { github, ai, session } = clientsFor(req);
     console.log(`[repo] analyze start ${body.url.trim()}${session ? " (session keys)" : ""}`);
     try {
-      const analysis = await analyzeRepository(body.url, { github, ai, emit, signal: abort.signal, skipAi: body.withAi !== true });
+      const analysis = await analyzeRepository(body.url, { github, ai, emit, signal: abort.signal, skipAi: body.withAi !== true, onContents: (id, texts) => contents.set(id, texts) });
       cache.set(analysis);
       emit({ type: "analysis", at: Date.now(), analysis });
       console.log(`[repo] analyze ok ${analysis.id} files=${analysis.stats.scannedFiles} nodes=${analysis.graph.nodes.length} in ${Date.now() - startedAt} ms`);
@@ -195,6 +209,87 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       question: body.question!.slice(0, 300), source: result.source, steps: result.steps.length, confidence: result.confidence, usage: result.usage,
     });
     res.json(result);
+  });
+
+  /**
+   * Starts the investigator agent on an analysis and streams its run as agent
+   * events. The scan's facts and file texts are its starting point; the agent
+   * reads further through tools that redact secrets, and code checks every
+   * citation in its answer before the run completes.
+   */
+  router.post("/investigate", async (req: Request, res: Response) => {
+    const body = (req.body ?? {}) as Partial<InvestigateRequestBody>;
+    const question = typeof body.question === "string" ? body.question.trim() : "";
+    if (typeof body.analysisId !== "string" || !question) {
+      res.status(400).json({ error: "analysisId and question are required." });
+      return;
+    }
+    if (question.length > 600) {
+      res.status(400).json({ error: "Question is too long (max 600 characters)." });
+      return;
+    }
+    const analysis = cache.get(body.analysisId);
+    if (!analysis) {
+      res.status(404).json({ error: "Analysis not found or expired. Analyze the repository again." });
+      return;
+    }
+    const provider: ProviderId = INVESTIGATOR_PROVIDERS.includes(body.llmProvider as ProviderId) ? (body.llmProvider as ProviderId) : "mock";
+    const keys = readSessionKeys(req);
+    let model: AgentModel;
+    try {
+      // The offline planner needs no key and is always offered: it is how the loop is seen without one.
+      model = provider === "mock" ? new OfflineInvestigatorModel(analysis, question) : createAgentModel(provider, getConfig(), { anthropic: keys.anthropic, anthropicWorkspace: keys.anthropicWorkspace, openai: keys.openai, google: keys.google });
+    } catch (err) {
+      if (err instanceof ProviderNotConfiguredError) {
+        res.status(400).json({ error: `${err.message} Add a key in Settings, or use the offline planner.` });
+        return;
+      }
+      throw err;
+    }
+
+    const runId = `investigate-${++investigationCounter}-${Date.now().toString(36)}`;
+    const { github } = clientsFor(req);
+    const scanned = contents.get(analysis.id);
+    const workspace = new RepoWorkspace(analysis, scanned ?? null, github);
+    const sse = new SSEWriter<AgentEvent>(res);
+    const abort = new AbortController();
+    res.on("close", () => abort.abort());
+    investigations.set(runId, abort);
+    const startedAt = Date.now();
+    let evidence: { verified: number; total: number } | null = null;
+    const emit = (e: AgentEvent) => {
+      if (e.type === "evidence_checked") evidence = { verified: e.verified, total: e.total };
+      sse.send(e);
+      if (e.type === "run_started" && !scanned) sse.send({ type: "notice", at: Date.now(), level: "warn", message: "The scan's file texts have left server memory, so search_code starts empty and covers only the files the agent opens." });
+    };
+    console.log(`[repo] investigate ${runId} start ${analysis.id} (${model.id}${model.mock ? ", offline" : ""}, ${workspace.loadedPaths().length} files loaded)`);
+    let outcome: RunOutcome | undefined;
+    try {
+      const run = await investigateRepository({ runId, question, workspace, model, emit, signal: abort.signal });
+      outcome = await run.done;
+    } catch (err) {
+      if (!abort.signal.aborted) sse.send({ type: "error", at: Date.now(), message: sanitize(err instanceof Error ? err.message : String(err)), retryable: false });
+    } finally {
+      investigations.delete(runId);
+      sse.end();
+      const checked = evidence as { verified: number; total: number } | null;
+      console.log(`[repo] investigate ${runId} ${outcome?.reason ?? "error"} in ${Date.now() - startedAt} ms · ${outcome?.toolCalls ?? 0} tool calls · citations ${checked ? `${checked.verified}/${checked.total} verified` : "none"}`);
+      history?.record({
+        kind: "repo_ask", at: startedAt, ok: outcome?.reason === "completed" || outcome?.reason === "max_iterations" || outcome?.reason === "token_budget",
+        durationMs: Date.now() - startedAt, analysisId: analysis.id, repo: analysis.meta.fullName, model: model.model,
+        question: question.slice(0, 300), source: model.mock ? "heuristic" : "ai", steps: outcome?.toolCalls ?? 0,
+      });
+    }
+  });
+
+  router.post("/investigate/:id/stop", (req: Request, res: Response) => {
+    const abort = investigations.get(String(req.params.id));
+    if (!abort) {
+      res.status(404).json({ error: "That investigation has finished or does not exist." });
+      return;
+    }
+    abort.abort();
+    res.json({ ok: true });
   });
 
   return router;

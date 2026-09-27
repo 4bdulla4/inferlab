@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
 
 /** Play, pause, step, replay, reset and speed for an agent run. The live agent keeps going whatever playback does. */
-export function AgentPlaybackControls({ run }: { run: AgentRunState | undefined }) {
+export function AgentPlaybackControls({ run, onReset, idleHint = "set a goal and press RUN" }: { run: AgentRunState | undefined; onReset?: () => void; idleHint?: string }) {
   const speed = useUIStore((s) => s.speed);
   const setSpeed = useUIStore((s) => s.setSpeed);
   const playing = run?.playback === "playing";
@@ -33,7 +33,7 @@ export function AgentPlaybackControls({ run }: { run: AgentRunState | undefined 
           Stop
         </Button>
       ) : run ? (
-        <Button size="sm" variant="ghost" icon={<Eraser />} onClick={() => agentRuntime.resetRuns()} title="Clear the stage (memory and files are kept)">
+        <Button size="sm" variant="ghost" icon={<Eraser />} onClick={() => (onReset ? onReset() : agentRuntime.resetRuns())} title={onReset ? "Clear this run" : "Clear the stage (memory and files are kept)"}>
           Reset
         </Button>
       ) : null}
@@ -45,7 +45,7 @@ export function AgentPlaybackControls({ run }: { run: AgentRunState | undefined 
             {run.liveDone ? <Badge tone={run.status === "error" ? "err" : run.status === "stopped" ? "warn" : "ok"}>{finished ? "done" : "playback"}</Badge> : <Badge tone="live">live</Badge>}
           </>
         ) : (
-          "set a goal and press RUN"
+          idleHint
         )}
       </span>
     </div>

@@ -1,16 +1,30 @@
-import { Loader2, MessageSquareText, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
+import { useEffect } from "react";
+import { Bot, Loader2, MessageSquareText, Pause, Play, RotateCcw, SkipForward, Square } from "lucide-react";
+import type { ProviderId } from "@shared/llm";
 import { askRepo } from "@/api/repoClient";
+import { agentRuntime } from "@/engine/agent/agentRuntime";
+import { useAgentStore } from "@/store/agentStore";
 import { tracePlayer } from "@/labs/repo/tracePlayer";
 import { PLAYBACK_SPEEDS } from "@/types/execution";
 import { cn } from "@/lib/cn";
-import { useRepoStore } from "@/store/repoStore";
+import { useRepoStore, type AskMode } from "@/store/repoStore";
 import { useUIStore } from "@/store/uiStore";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Segmented } from "@/components/ui/Segmented";
 import { GlassPanel } from "@/components/layout/GlassPanel";
 import { EvidenceBadge, EvidenceDot } from "./EvidenceBadge";
+import { InvestigationAnswer } from "./InvestigationAnswer";
 import { formatUsage } from "./OverviewPanel";
+
+const OFFLINE: { id: ProviderId; label: string } = { id: "mock", label: "Offline planner (simulation)" };
+
+/** Providers the investigator can use right now: configured models, then the always-available offline planner. */
+function useInvestigatorProviders(): { id: ProviderId; label: string }[] {
+  const status = useAgentStore((s) => s.status);
+  const live = (status?.providers ?? []).filter((p) => p.configured && !p.mock).map((p) => ({ id: p.id, label: p.name }));
+  return [...live, OFFLINE];
+}
 
 const SUGGESTIONS = [
   "How does authentication work?",
@@ -37,6 +51,34 @@ export function QuestionPanel({ className }: { className?: string }) {
   const showTrace = useRepoStore((s) => s.showTrace);
   const speed = useUIStore((s) => s.speed);
   const setSpeed = useUIStore((s) => s.setSpeed);
+  const mode = useRepoStore((s) => s.askMode);
+  const setMode = useRepoStore((s) => s.setAskMode);
+  const investigation = useRepoStore((s) => s.investigation);
+  const investigations = useRepoStore((s) => s.investigationHistory);
+  const setInvestigation = useRepoStore((s) => s.setInvestigation);
+  const preferred = useRepoStore((s) => s.investigatorProvider);
+  const setProvider = useRepoStore((s) => s.setInvestigatorProvider);
+  const runs = useAgentStore((s) => s.runs);
+  const run = investigation ? runs[investigation.runId] : undefined;
+  const investigating = run?.status === "running";
+  const providers = useInvestigatorProviders();
+  const provider = providers.find((p) => p.id === preferred)?.id ?? providers[0]!.id;
+
+  useEffect(() => {
+    if (!useAgentStore.getState().status) void agentRuntime.refreshStatus();
+  }, []);
+
+  const investigate = async (q = question) => {
+    const store = useRepoStore.getState();
+    if (!store.analysis || !q.trim() || investigating) return;
+    store.setQuestion(q);
+    useAgentStore.getState().selectNode(null);
+    const runId = await agentRuntime.investigate(store.analysis.id, q.trim(), provider);
+    useRepoStore.getState().setInvestigation({ runId, analysisId: store.analysis.id, question: q.trim(), provider, startedAt: Date.now() });
+  };
+
+  const submit = (q = question) => (mode === "investigate" ? investigate(q) : ask(q));
+  const busy = mode === "investigate" ? investigating : asking;
 
   const ask = async (q = question) => {
     const store = useRepoStore.getState();
@@ -55,42 +97,88 @@ export function QuestionPanel({ className }: { className?: string }) {
   return (
     <GlassPanel
       title="Ask about this product"
-      subtitle={analysis ? (analysis.ai.available ? "answers: AI-inferred · steps checked against the index" : "answers: heuristic tracer (no model key)") : undefined}
+      subtitle={
+        analysis
+          ? mode === "investigate"
+            ? "an agent reads the code · citations checked by code"
+            : analysis.ai.available
+              ? "one model call · steps checked against the index"
+              : "heuristic tracer (no model key)"
+          : undefined
+      }
       className={className}
       bodyClassName="p-4 grid gap-3 overflow-y-auto panel-scroll content-start"
     >
+      <Segmented<AskMode>
+        ariaLabel="How to answer"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "investigate", label: "Investigate with an agent", title: "An agent searches and reads the code over several rounds, then cites the lines it read" },
+          { value: "trace", label: "Quick trace", title: "One pass over the scan's index: faster, but it does not read function bodies" },
+        ]}
+      />
       <form
         className="grid gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          void ask();
+          void submit();
         }}
       >
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void ask();
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit();
           }}
           rows={2}
           maxLength={600}
-          disabled={!analysis || asking || rescanning}
+          disabled={!analysis || busy || rescanning}
           placeholder={rescanning ? "Waiting for the new scan to finish…" : analysis ? "How does authentication work? What happens when a user clicks…?" : "Analyze a repository first"}
           aria-label="Question about the repository"
           className="w-full resize-y rounded-lg border border-line bg-bg-elevated/80 px-3 py-2 text-[13px] leading-relaxed text-ink placeholder:text-faint focus:border-accent/60 disabled:opacity-60"
         />
-        <div className="flex items-center gap-2">
-          <Button type="submit" variant="primary" size="md" icon={asking ? <Loader2 className="animate-spin" /> : <MessageSquareText />} disabled={!analysis || !question.trim() || asking || rescanning}>
-            {asking ? "Tracing…" : "Trace the code path"}
-          </Button>
-          <span className="mono text-[10.5px] text-muted">⌘/Ctrl + Enter</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {mode === "investigate" ? (
+            investigating && run ? (
+              <Button type="button" variant="danger" size="md" icon={<Square />} onClick={() => agentRuntime.stop(run.id)}>
+                Stop the agent
+              </Button>
+            ) : (
+              <Button type="submit" variant="primary" size="md" icon={<Bot />} disabled={!analysis || !question.trim() || rescanning}>
+                Investigate
+              </Button>
+            )
+          ) : (
+            <Button type="submit" variant="primary" size="md" icon={asking ? <Loader2 className="animate-spin" /> : <MessageSquareText />} disabled={!analysis || !question.trim() || asking || rescanning}>
+              {asking ? "Tracing…" : "Trace the code path"}
+            </Button>
+          )}
+          {mode === "investigate" ? (
+            <label className="inline-flex items-center gap-1.5 min-w-0">
+              <span className="label-caps">model</span>
+              <select value={provider} onChange={(e) => setProvider(e.target.value as ProviderId)} disabled={investigating} aria-label="Model for the investigator" className="h-8 max-w-[220px] rounded-md border border-line bg-bg-elevated/80 px-2 mono text-[11px] text-ink truncate disabled:opacity-60">
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <span className="mono text-[10.5px] text-muted ml-auto">⌘/Ctrl + Enter</span>
         </div>
+        {mode === "investigate" && provider === "mock" ? (
+          <p className="text-[11px] text-muted leading-snug">
+            {providers.length > 1 ? "The offline planner picks its steps by rule instead of asking a model." : "No model key is configured, so the offline planner picks the steps by rule."} The files it reads are real{providers.length > 1 ? "; pick a model for an explained answer." : "; add a key in Settings for an explained answer."}
+          </p>
+        ) : null}
       </form>
 
-      {analysis && !trace && !rescanning ? (
+      {analysis && !rescanning && (mode === "investigate" ? !investigation : !trace) ? (
         <div className="flex flex-wrap gap-1.5">
           {SUGGESTIONS.map((q) => (
-            <button key={q} type="button" disabled={asking} onClick={() => void ask(q)} className="rounded-md border border-line surface-1 px-2 py-1 text-[11.5px] text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50 text-left">
+            <button key={q} type="button" disabled={busy} onClick={() => void submit(q)} className="rounded-md border border-line surface-1 px-2 py-1 text-[11.5px] text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50 text-left">
               {q}
             </button>
           ))}
@@ -103,7 +191,25 @@ export function QuestionPanel({ className }: { className?: string }) {
         </p>
       ) : null}
 
-      {trace ? (
+      {mode === "investigate" && analysis ? (
+        <>
+          {run ? <InvestigationAnswer run={run} analysis={analysis} /> : null}
+          {investigations.filter((r) => r.runId !== investigation?.runId && runs[r.runId]).length ? (
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-line">
+              <span className="label-caps w-full">Previous investigations</span>
+              {investigations
+                .filter((r) => r.runId !== investigation?.runId && runs[r.runId])
+                .map((r) => (
+                  <button key={r.runId} type="button" disabled={investigating} onClick={() => setInvestigation(r)} className="mono rounded-md border border-line px-2 h-6 text-[10.5px] text-muted hover:text-ink truncate max-w-full disabled:opacity-50">
+                    {r.question}
+                  </button>
+                ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {mode === "trace" && trace ? (
         <div className="grid gap-3">
           <div className={cn("rounded-lg border p-3 grid gap-2", trace.source === "ai" ? "border-sim/30 bg-sim/[0.05]" : "border-warn/30 bg-warn/[0.05]")}>
             <div className="flex flex-wrap items-center gap-2">

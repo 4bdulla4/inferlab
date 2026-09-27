@@ -29,6 +29,7 @@ const DURATION: Record<AgentEventType, number> = {
   FINAL_RESPONSE: 800,
   RUN_COMPLETED: 900,
   NOTICE: 200,
+  EVIDENCE_CHECKED: 1100,
   EXECUTION_ERROR: 500,
   EXECUTION_STOPPED: 300,
 };
@@ -45,6 +46,7 @@ export const NODE_IDS = {
   fallback: (callId: string) => `fallback-${callId}`,
   observation: (n: number) => `observe-${n}`,
   response: "response",
+  evidence: "evidence",
   done: "done",
 };
 
@@ -70,6 +72,7 @@ export class AgentEventSequencer {
   private lastObservedNodeId: string | null = null;
   private lastDecisionNodeId: string | null = null;
   private observationOpen = new Set<number>();
+  private evidenceChecked = false;
 
   constructor(private readonly runId: string) {}
 
@@ -165,9 +168,13 @@ export class AgentEventSequencer {
         return [this.make("FINAL_RESPONSE", "response", NODE_IDS.response, "completed", ev.source, { text: ev.text, iteration: ev.iteration, fromNodeId: this.lastDecisionNodeId ?? NODE_IDS.plan(ev.iteration) }, `${ev.text.length} characters`, ev.at)];
       case "run_completed": {
         const failed = ev.reason === "error" || ev.reason === "stopped";
-        const from = ev.reason === "completed" || ev.reason === "max_iterations" || ev.reason === "token_budget" || ev.reason === "timeout" ? NODE_IDS.response : this.lastNodeId;
+        const answered = ev.reason === "completed" || ev.reason === "max_iterations" || ev.reason === "token_budget" || ev.reason === "timeout";
+        const from = answered ? (this.evidenceChecked ? NODE_IDS.evidence : NODE_IDS.response) : this.lastNodeId;
         return [this.make("RUN_COMPLETED", "done", NODE_IDS.done, failed ? "error" : "completed", "live", { reason: ev.reason, iterations: ev.iterations, totalMs: ev.totalMs, usage: ev.usage, toolCalls: ev.toolCalls, errors: ev.errors, retries: ev.retries, state: ev.state, fromNodeId: from }, `Run ${ev.reason.replace(/_/g, " ")} · ${ev.iterations} iteration${ev.iterations === 1 ? "" : "s"}`, ev.at)];
       }
+      case "evidence_checked":
+        this.evidenceChecked = true;
+        return [this.make("EVIDENCE_CHECKED", "evidence", NODE_IDS.evidence, "completed", "live", { citations: ev.citations, verified: ev.verified, total: ev.total, fromNodeId: NODE_IDS.response }, ev.total ? `Evidence · ${ev.verified}/${ev.total} citations verified` : "Evidence · no citations to check", ev.at)];
       case "notice":
         return [this.make("NOTICE", this.kindOf(this.lastNodeId), this.lastNodeId, "info", "live", { level: ev.level, message: ev.message }, ev.message, ev.at)];
       case "error":

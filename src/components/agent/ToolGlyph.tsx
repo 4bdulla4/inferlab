@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Bot, Brain, Calculator, CheckCircle2, Cpu, Database, FileText, Flag, GitFork, Globe, LifeBuoy, ListChecks, MessageSquare, Plug, Puzzle, ScrollText, Search, Target, UserCheck, Wrench, Eye, Send } from "lucide-react";
+import { Bot, Brain, ShieldCheck, Calculator, CheckCircle2, Cpu, Database, FileText, Flag, GitFork, Globe, LifeBuoy, ListChecks, MessageSquare, Plug, Puzzle, ScrollText, Search, Target, UserCheck, Wrench, Eye, Send } from "lucide-react";
 import type { ToolCategory } from "@shared/agent";
 import type { AgentNodeKind } from "@/labs/agent/stages";
 
@@ -28,6 +28,7 @@ const KIND_ICON: Record<AgentNodeKind, ComponentType<{ className?: string }>> = 
   fallback: LifeBuoy,
   observation: Eye,
   response: Send,
+  evidence: ShieldCheck,
   done: Flag,
 };
 

@@ -6,7 +6,7 @@ import type { AgentStatus, ToolCategory } from "@shared/agent";
  * is not fixed: a run adds a planning, decision and observation node per
  * iteration and one node per tool call, so these are kinds, not stages.
  */
-export type AgentNodeKind = "goal" | "init" | "instructions" | "context" | "plan" | "decision" | "approval" | "tool" | "fallback" | "observation" | "response" | "done";
+export type AgentNodeKind = "goal" | "init" | "instructions" | "context" | "plan" | "decision" | "approval" | "tool" | "fallback" | "observation" | "response" | "evidence" | "done";
 
 export interface AgentNodeDefinition {
   kind: AgentNodeKind;
@@ -106,6 +106,14 @@ export const AGENT_NODES: Record<AgentNodeKind, AgentNodeDefinition> = {
     beginner: "The agent writes its answer to your goal.",
     advanced: "A response with no tool calls ends the loop. Text streams as the provider sends it; the finish reason and usage are the API's.",
     sourceNote: "Live: the model's own words. With the offline planner the text is scripted and labelled a simulation.",
+  },
+  evidence: {
+    kind: "evidence",
+    label: "Evidence Check",
+    defaultSource: "live",
+    beginner: "After the agent answers, code checks every file and line it cited: does the file exist, and did the agent actually read those lines?",
+    advanced: "Each path:line in the answer is resolved against the repository tree and compared with the line ranges the tools returned during the run. Citations are verified, unseen (never shown to the agent), out of range, or missing.",
+    sourceNote: "Live: a deterministic check in code. It does not depend on the model and cannot be talked out of a result.",
   },
   done: {
     kind: "done",

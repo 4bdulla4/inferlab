@@ -32,3 +32,37 @@ export class AnalysisCache {
     return undefined;
   }
 }
+
+/**
+ * The file texts behind recent analyses, kept so the investigator can search
+ * them without downloading the repository again. Several megabytes each, so
+ * only the last few are held; an evicted entry just means the investigator
+ * downloads what it opens.
+ */
+export class ContentCache {
+  private readonly map = new Map<string, { value: Map<string, string>; expires: number }>();
+
+  constructor(private readonly max = 4, private readonly ttlMs = 2 * 60 * 60 * 1000) {}
+
+  get(id: string): Map<string, string> | undefined {
+    const entry = this.map.get(id);
+    if (!entry) return undefined;
+    if (entry.expires < Date.now()) {
+      this.map.delete(id);
+      return undefined;
+    }
+    this.map.delete(id);
+    this.map.set(id, entry);
+    return entry.value;
+  }
+
+  set(id: string, value: Map<string, string>): void {
+    this.map.delete(id);
+    this.map.set(id, { value, expires: Date.now() + this.ttlMs });
+    while (this.map.size > this.max) {
+      const oldest = this.map.keys().next().value;
+      if (oldest === undefined) break;
+      this.map.delete(oldest);
+    }
+  }
+}

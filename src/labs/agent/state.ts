@@ -1,5 +1,5 @@
 import type { DataSource, UsageInfo } from "@shared/llm";
-import type { AgentConfig, AgentStateSnapshot, AgentToolDescriptor, MemoryEntry, MessageSummary, TerminationReason, ToolCallRequest, ToolCategory, ToolRationale, ToolResult } from "@shared/agent";
+import type { AgentConfig, AgentStateSnapshot, EvidenceCitation, AgentToolDescriptor, MemoryEntry, MessageSummary, TerminationReason, ToolCallRequest, ToolCategory, ToolRationale, ToolResult } from "@shared/agent";
 import type { EventStatus, NodeState, PlaybackState, RunStatus } from "@/types/execution";
 import type { AnyAgentEvent } from "./events";
 import type { AgentNodeKind } from "./stages";
@@ -97,6 +97,8 @@ export interface AgentVisualState {
   finalPieces: number;
   final?: { text: string; iteration: number; source: DataSource };
   completion?: { reason: TerminationReason; iterations: number; totalMs: number; usage: { inputTokens: number; outputTokens: number; totalTokens: number }; toolCalls: number; errors: number; retries: number };
+  /** Code's check of the answer's citations (repository investigations). */
+  evidence?: { citations: EvidenceCitation[]; verified: number; total: number };
   pendingApproval?: { callId: string; nodeId: string; tool: string; prompt: string; kind: "approve" | "answer"; args: Record<string, unknown> };
 
   notices: { level: "info" | "warn"; message: string; at: number }[];

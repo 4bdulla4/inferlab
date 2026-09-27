@@ -1,5 +1,5 @@
 import type { UsageInfo } from "@shared/llm";
-import type { AgentConfig, AgentStateSnapshot, AgentToolDescriptor, MemoryEntry, MessageSummary, TerminationReason, ToolCallRequest, ToolRationale, ToolResult } from "@shared/agent";
+import type { AgentConfig, AgentStateSnapshot, EvidenceCitation, AgentToolDescriptor, MemoryEntry, MessageSummary, TerminationReason, ToolCallRequest, ToolRationale, ToolResult } from "@shared/agent";
 import type { ExecutionEvent } from "@/types/execution";
 import type { AgentNodeKind } from "./stages";
 
@@ -31,6 +31,7 @@ export interface AgentEventDataMap {
   FINAL_RESPONSE: { nodeId: string; text: string; iteration: number; fromNodeId: string };
   RUN_COMPLETED: { nodeId: string; reason: TerminationReason; iterations: number; totalMs: number; usage: { inputTokens: number; outputTokens: number; totalTokens: number }; toolCalls: number; errors: number; retries: number; state: AgentStateSnapshot; fromNodeId: string };
   NOTICE: { nodeId: string; level: "info" | "warn"; message: string };
+  EVIDENCE_CHECKED: { nodeId: string; citations: EvidenceCitation[]; verified: number; total: number; fromNodeId: string };
   EXECUTION_ERROR: { nodeId: string; message: string; status?: number; retryable: boolean };
   EXECUTION_STOPPED: { nodeId: string };
 }

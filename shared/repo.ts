@@ -7,6 +7,8 @@
  *   - "ai"        → proposed by a language model, then checked against the repository index
  */
 
+import type { ProviderId } from "./llm";
+
 export type EvidenceKind = "verified" | "heuristic" | "ai";
 
 export interface Evidence {
@@ -310,6 +312,24 @@ export interface AskRequestBody {
   analysisId: string;
   question: string;
 }
+
+/** Starts the investigator agent on an existing analysis; the response streams `AgentEvent`s. */
+export interface InvestigateRequestBody {
+  analysisId: string;
+  question: string;
+  /** "mock" runs the offline planner, labelled a simulation. */
+  llmProvider: ProviderId;
+}
+
+export const INVESTIGATION_LIMITS = {
+  maxIterations: 10,
+  /** Files the agent may download beyond the ones the scan already read. */
+  maxExtraFiles: 40,
+  maxReadLines: 220,
+  maxSearchResults: 40,
+  tokenBudget: 250_000,
+  timeoutMs: 300_000,
+};
 
 export interface RepoServiceStatus {
   githubTokenConfigured: boolean;

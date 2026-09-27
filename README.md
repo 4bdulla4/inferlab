@@ -57,7 +57,7 @@ If something cannot be observed honestly, it is labelled or it is not shown.
 | **RAG** | Documents become an index and a question finds its way through it: chunking, overlap, embedding, the vector store, search, top-K, the assembled context, the prompt, and an answer traced back to the passages it cited. |
 | **Agents** | An agent loop turn by turn: goal, instructions, context, planning, tool selection, real tool execution, observation, state update, the next decision, retries, fallbacks, parallel calls, human approval gates, and termination. |
 | **ML** | A model train for real: ingestion, inspection, cleaning, imputation, encoding, scaling, splitting, then the loop — forward, loss, gradient, backprop, update — epoch by epoch, then validation, testing, evaluation and inference on a row you type. Eight algorithms. |
-| **GitHub Analyzer** | A public repository read and mapped: frontend, backend, routes, schema, auth, dependencies, integrations, jobs and deploy config, drawn as an architecture diagram with real files and line numbers attached, and the code path behind a question traced on it. |
+| **GitHub Analyzer** | A public repository read and mapped: frontend, backend, routes, schema, auth, dependencies, integrations, jobs and deploy config, drawn as an architecture diagram with real files and line numbers attached. Questions go to an investigator agent that searches and reads the code over several rounds on the same live graph as the Agents lab; code then checks every `path:line` it cites against what it actually read. |
 | **Pipelines** | How the Claude, OpenAI and Gemini request paths genuinely differ, stage by stage. |
 | **Dashboard** | Everything the platform has done: analyses, model calls, training runs, token usage over time. |
 
@@ -270,7 +270,7 @@ server/
   rag/             extraction, chunking, embeddings, vector store, retrieval
   ml/              parsing, preprocessing, metrics, 8 algorithms, training orchestrator
   agent/           agent runner, tool implementations, model adapters, blueprint analyzer
-  analyzer/        GitHub client, file selection, detectors, graph builder, tracer
+  analyzer/        GitHub client, file selection, detectors, graph builder, tracer, investigator agent
   routes/          one SSE route per lab
 src/
   engine/          EventBus · PlaybackController · per-lab runtimes · seeded simulation

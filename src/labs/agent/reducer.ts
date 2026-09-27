@@ -211,6 +211,11 @@ const GRAPH_HANDLERS: GraphHandlers = {
     const out = addNode(s, { id: d.nodeId, kind: "done", label: AGENT_NODES.done.label, sublabel: `${d.reason.replace(/_/g, " ")} · ${formatMs(d.totalMs)}` }, d.fromNodeId);
     return { ...out, completion: { reason: d.reason, iterations: d.iterations, totalMs: d.totalMs, usage: d.usage, toolCalls: d.toolCalls, errors: d.errors, retries: d.retries }, snapshot: d.state, snapshots: { ...out.snapshots, [d.nodeId]: d.state }, pendingApproval: undefined };
   },
+  EVIDENCE_CHECKED: (s, event) => {
+    const d = event.data;
+    const sub = d.total ? `${d.verified}/${d.total} citations verified` : "no citations to check";
+    return { ...addNode(s, { id: d.nodeId, kind: "evidence", label: AGENT_NODES.evidence.label, sublabel: sub }, d.fromNodeId), evidence: { citations: d.citations, verified: d.verified, total: d.total } };
+  },
   NOTICE: (s, event) => {
     const d = event.data;
     return { ...s, notices: [...s.notices, { level: d.level, message: d.message, at: event.timestamp }] };

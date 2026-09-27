@@ -1,5 +1,7 @@
 import type { AgentConfig, AgentEvent } from "@shared/agent";
-import { clearAgentSession, fetchAgentSession, fetchAgentStatus, resolveAgentApproval, stopAgentRun, streamAgentRun } from "@/api/agentClient";
+import type { ProviderId } from "@shared/llm";
+import { DEFAULT_AGENT_CONFIG } from "@shared/agent";
+import { clearAgentSession, fetchAgentSession, fetchAgentStatus, resolveAgentApproval, stopAgentRun, stopInvestigation, streamAgentRun, streamInvestigation } from "@/api/agentClient";
 import { EventBus } from "@/engine/events/EventBus";
 import { PlaybackController, type PlaybackHost } from "@/engine/execution/PlaybackController";
 import type { AnyAgentEvent } from "@/labs/agent/events";
@@ -12,6 +14,19 @@ interface Handle {
   controller: PlaybackController<AnyAgentEvent>;
   bus: EventBus<AnyAgentEvent>;
   abort: AbortController;
+  /** Asks the server to end the loop cleanly; which endpoint depends on the kind of run. */
+  stopServer: (serverRunId: string) => Promise<void>;
+}
+
+interface LaunchOptions {
+  goal: string;
+  config: AgentConfig;
+  scenarioId: string | null;
+  /** Agent-lab runs become the lab's active run; investigations belong to the repository page. */
+  activate: boolean;
+  stream: (onEvent: (ev: AgentEvent) => void, signal: AbortSignal) => Promise<void>;
+  stopServer: (serverRunId: string) => Promise<void>;
+  onFinished?: () => void;
 }
 
 /** Behaviour lives here; the store only holds data. */
@@ -87,43 +102,31 @@ export const agentRuntime = {
 
   /** Starts a run: creates the record, wires the bus to the store, starts playback and the stream. */
   async start(goal: string, config: AgentConfig, scenarioId: string | null): Promise<string> {
-    const store = useAgentStore.getState();
-    const runId = `agent-${store.runCounter + 1}-${Date.now().toString(36)}`;
-    store.createRun(createAgentRun({ id: runId, goal, config, scenarioId }));
-    store.setActiveRun(runId);
-    store.selectNode(null);
-    const bus = new EventBus<AnyAgentEvent>();
-    bus.on("*", (e) => useAgentStore.getState().appendEvents(runId, [e]));
-    const controller = new PlaybackController<AnyAgentEvent>(host(runId));
-    const abort = new AbortController();
-    handles.set(runId, { controller, bus, abort });
-    controller.play();
-    const sequencer = new AgentEventSequencer(runId);
-    let failed = false;
-    let stoppedByUs = false;
+    return launch({
+      goal,
+      config,
+      scenarioId,
+      activate: true,
+      stream: (onEvent, signal) => streamAgentRun({ goal, config, scenarioId, sessionId: agentSessionId() }, onEvent, signal),
+      stopServer: stopAgentRun,
+      onFinished: () => void this.refreshWorkspace(),
+    });
+  },
 
-    const onEvent = (ev: AgentEvent) => {
-      if (ev.type === "run_started") useAgentStore.getState().setServerRunId(runId, ev.runId);
-      if (ev.type === "error") failed = true;
-      if (ev.type === "run_completed" && ev.reason === "stopped") stoppedByUs = true;
-      bus.emitAll(sequencer.fromServer(ev));
-    };
-
-    streamAgentRun({ goal, config, scenarioId, sessionId: agentSessionId() }, onEvent, abort.signal)
-      .then(() => {
-        useAgentStore.getState().setRunStatus(runId, failed ? "error" : stoppedByUs ? "stopped" : "completed", true);
-        void this.refreshWorkspace();
-      })
-      .catch((err: unknown) => {
-        if (abort.signal.aborted) {
-          bus.emitAll(sequencer.stopped());
-          useAgentStore.getState().setRunStatus(runId, "stopped", true);
-        } else {
-          bus.emitAll(sequencer.failed(err instanceof Error ? err.message : String(err), (err as { status?: number }).status));
-          useAgentStore.getState().setRunStatus(runId, "error", true);
-        }
-      });
-    return runId;
+  /**
+   * Starts the repository investigator on an analysis. It is an agent run like
+   * any other, so it plays back, steps and replays on the same graph, but it
+   * stays out of the Agents lab's run list.
+   */
+  async investigate(analysisId: string, question: string, llmProvider: ProviderId): Promise<string> {
+    return launch({
+      goal: question,
+      config: { ...DEFAULT_AGENT_CONFIG, llmProvider, tools: [] },
+      scenarioId: null,
+      activate: false,
+      stream: (onEvent, signal) => streamInvestigation({ analysisId, question, llmProvider }, onEvent, signal),
+      stopServer: stopInvestigation,
+    });
   },
 
   /** Approve or reject a gated tool call, or answer the agent's question. */
@@ -136,8 +139,9 @@ export const agentRuntime = {
   stop(runId: string): void {
     const run = useAgentStore.getState().runs[runId];
     // Ask the server to end the loop cleanly; closing the stream also aborts it.
-    if (run?.serverRunId) void stopAgentRun(run.serverRunId);
-    handles.get(runId)?.abort.abort();
+    const handle = handles.get(runId);
+    if (run?.serverRunId) void (handle?.stopServer ?? stopAgentRun)(run.serverRunId);
+    handle?.abort.abort();
   },
   play(runId: string): void {
     handles.get(runId)?.controller.play();
@@ -158,6 +162,18 @@ export const agentRuntime = {
     return handles.get(runId)?.controller.isFinished() ?? true;
   },
 
+  /** Drops one run: stops it if it is still going and forgets its log. */
+  discard(runId: string): void {
+    const h = handles.get(runId);
+    if (h) {
+      h.abort.abort();
+      h.controller.dispose();
+      h.bus.clear();
+      handles.delete(runId);
+    }
+    useAgentStore.getState().removeRun(runId);
+  },
+
   /** Drops every run (not the workspace). */
   resetRuns(): void {
     for (const h of handles.values()) {
@@ -169,3 +185,45 @@ export const agentRuntime = {
     useAgentStore.getState().clearRuns();
   },
 };
+
+async function launch(o: LaunchOptions): Promise<string> {
+  const store = useAgentStore.getState();
+  const runId = `agent-${store.runCounter + 1}-${Date.now().toString(36)}`;
+  store.createRun(createAgentRun({ id: runId, goal: o.goal, config: o.config, scenarioId: o.scenarioId }));
+  if (o.activate) {
+    store.setActiveRun(runId);
+    store.selectNode(null);
+  }
+  const bus = new EventBus<AnyAgentEvent>();
+  bus.on("*", (e) => useAgentStore.getState().appendEvents(runId, [e]));
+  const controller = new PlaybackController<AnyAgentEvent>(host(runId));
+  const abort = new AbortController();
+  handles.set(runId, { controller, bus, abort, stopServer: o.stopServer });
+  controller.play();
+  const sequencer = new AgentEventSequencer(runId);
+  let failed = false;
+  let stoppedByUs = false;
+
+  const onEvent = (ev: AgentEvent) => {
+    if (ev.type === "run_started") useAgentStore.getState().setServerRunId(runId, ev.runId);
+    if (ev.type === "error") failed = true;
+    if (ev.type === "run_completed" && ev.reason === "stopped") stoppedByUs = true;
+    bus.emitAll(sequencer.fromServer(ev));
+  };
+
+  o.stream(onEvent, abort.signal)
+    .then(() => {
+      useAgentStore.getState().setRunStatus(runId, failed ? "error" : stoppedByUs ? "stopped" : "completed", true);
+      o.onFinished?.();
+    })
+    .catch((err: unknown) => {
+      if (abort.signal.aborted) {
+        bus.emitAll(sequencer.stopped());
+        useAgentStore.getState().setRunStatus(runId, "stopped", true);
+      } else {
+        bus.emitAll(sequencer.failed(err instanceof Error ? err.message : String(err), (err as { status?: number }).status));
+        useAgentStore.getState().setRunStatus(runId, "error", true);
+      }
+    });
+  return runId;
+}

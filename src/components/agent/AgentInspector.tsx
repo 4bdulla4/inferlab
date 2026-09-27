@@ -14,6 +14,7 @@ import { GlassPanel } from "@/components/layout/GlassPanel";
 import { SourceBadge } from "@/components/layout/SourceBadge";
 import { NODE_STATE_LABEL, StatusIcon } from "@/components/layout/StatusIcon";
 import { Badge } from "@/components/ui/Badge";
+import { EvidenceList, evidenceSummary } from "./EvidenceList";
 import { NodeGlyph } from "./ToolGlyph";
 
 /** What the three panels are all looking at right now. */
@@ -64,7 +65,7 @@ function NodeTitle({ node, state, reducedMotion }: { node: AgentGraphNode; state
 /* ───────────────────────────── inspector ────────────────────────────── */
 
 /** Explanation, the reason a tool was chosen, key facts and data source for the step in view. */
-export function AgentInspectorPanel({ run, className }: { run: AgentRunState | undefined; className?: string }) {
+export function AgentInspectorPanel({ run, className, title = "Inspector" }: { run: AgentRunState | undefined; className?: string; title?: string }) {
   const mode = useUIStore((s) => s.mode);
   const reducedMotion = useReducedMotion();
   const { nodeId, node, def, state, source, call, pinned, toggleFollow, visual } = useInspectedNode(run);
@@ -76,7 +77,7 @@ export function AgentInspectorPanel({ run, className }: { run: AgentRunState | u
   return (
     <GlassPanel
       bodyRef={bodyRef}
-      title="Inspector"
+      title={title}
       subtitle={node ? <NodeTitle node={node} state={state} reducedMotion={reducedMotion} /> : undefined}
       actions={
         <>
@@ -241,6 +242,12 @@ function NodeFacts({ node, visual: v, call }: { node: AgentGraphNode; visual: Ag
       push("characters", v.finalText.length || undefined);
       push("streamed pieces", v.finalPieces || undefined);
       push("iteration", v.final?.iteration);
+      break;
+    case "evidence":
+      push("citations", v.evidence?.total);
+      push("verified", v.evidence?.verified);
+      push("not read by the agent", v.evidence ? v.evidence.citations.filter((c) => c.status === "unseen").length || undefined : undefined);
+      push("wrong file or line", v.evidence ? v.evidence.citations.filter((c) => c.status === "missing" || c.status === "out_of_range").length || undefined : undefined);
       break;
     case "done":
       push("reason", v.completion?.reason.replace(/_/g, " "));
@@ -445,6 +452,15 @@ function StepDetail({ node, visual: v, call }: { node: AgentGraphNode; visual: A
       );
     case "response":
       return <AnswerText text={v.finalText} streaming={!v.final && !v.error && !v.stopped} source={v.final?.source} />;
+    case "evidence":
+      return v.evidence ? (
+        <div className="grid gap-2">
+          <p className="text-[12.5px] text-ink-dim leading-snug">{evidenceSummary(v.evidence.verified, v.evidence.total)}</p>
+          <EvidenceList citations={v.evidence.citations} />
+        </div>
+      ) : (
+        <Empty>The citation check appears here once the agent answers.</Empty>
+      );
     case "done":
       return v.completion ? (
         <div className="grid gap-2">
