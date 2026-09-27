@@ -10,6 +10,15 @@ export interface FeedItem {
   at: number;
 }
 
+/** The notification menu forgets activity older than this; the Dashboard keeps all of it. */
+export const FEED_WINDOW_MS = 24 * 60 * 60 * 1000;
+const FEED_LIMIT = 12;
+
+/** The newest items from the last 24 hours, at most FEED_LIMIT of them. */
+export function recentFeed(items: FeedItem[], now: number): FeedItem[] {
+  return items.filter((i) => now - i.at < FEED_WINDOW_MS).slice(0, FEED_LIMIT);
+}
+
 /** One line of the notification menu. It names the provider, never the model id. */
 export function describeEntry(e: HistoryEntry): FeedItem {
   const base = { id: e.id, ok: e.ok, at: e.at };
@@ -31,8 +40,9 @@ export function useHistoryFeed(active: boolean) {
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchHistory(12);
-      const items = data.entries.map(describeEntry);
+      // Fetch a little more than is shown, so the window still fills after older items drop out.
+      const data = await fetchHistory(FEED_LIMIT * 4);
+      const items = recentFeed(data.entries.map(describeEntry), Date.now());
       setEntries(items);
       setUnread(items.filter((i) => i.at > seenAt.current).length);
     } catch {

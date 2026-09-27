@@ -14,3 +14,15 @@ describe("notification feed titles", () => {
     expect(JSON.stringify(entries.map(describeEntry))).not.toMatch(/claude-opus|gpt-5/);
   });
 });
+
+describe("notification feed window", () => {
+  it("keeps only the last 24 hours, newest twelve at most", async () => {
+    const { recentFeed, FEED_WINDOW_MS } = await import("./useHistoryFeed");
+    const now = 10 * FEED_WINDOW_MS;
+    const item = (id: string, ageMs: number) => ({ id, title: id, detail: "", ok: true, at: now - ageMs });
+    const out = recentFeed([item("fresh", 60_000), item("almost", FEED_WINDOW_MS - 1), item("day-old", FEED_WINDOW_MS), item("old", 3 * FEED_WINDOW_MS)], now);
+    expect(out.map((i) => i.id)).toEqual(["fresh", "almost"]);
+    const many = Array.from({ length: 30 }, (_, i) => item(`n${i}`, i * 1000));
+    expect(recentFeed(many, now)).toHaveLength(12);
+  });
+});

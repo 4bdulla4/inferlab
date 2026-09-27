@@ -249,9 +249,9 @@ function Notifications() {
       </button>
       {open ? (
         <div className="popover absolute right-0 top-11 z-50 w-[320px] rounded-xl p-2">
-          <p className="label-caps px-2 pb-2">Recent activity</p>
+          <p className="label-caps px-2 pb-2">Recent activity · last 24 hours</p>
           {entries.length === 0 ? (
-            <p className="px-2 pb-2 text-[12px] text-muted">Nothing yet. Runs and analyses show up here.</p>
+            <p className="px-2 pb-2 text-[12px] text-muted">Nothing in the last 24 hours. Runs and analyses show up here; the Dashboard keeps the full history.</p>
           ) : (
             <ul className="grid gap-0.5 max-h-[300px] overflow-y-auto panel-scroll">
               {entries.map((e) => (
