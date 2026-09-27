@@ -24,7 +24,9 @@ export default defineConfig({
     proxy: {
       // All provider calls go through the backend. API keys never reach the browser.
       "/api": {
-        target: `http://localhost:${API_PORT}`,
+        // 127.0.0.1, not "localhost": the API listens on IPv4 loopback only, and
+        // "localhost" can resolve to ::1 first.
+        target: `http://127.0.0.1:${API_PORT}`,
         changeOrigin: true,
       },
     },

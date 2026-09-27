@@ -204,6 +204,8 @@ what is missing.
 | `GITHUB_TOKEN` | Private repositories, and raises the analyzer's rate limit from 60 to 5,000 req/hour. |
 | `ANTHROPIC_WORKSPACE_ID` | Needed for org-level Anthropic keys not scoped to a workspace. |
 | `API_PORT` | API port, default `8790`. |
+| `API_HOST` | Interface the API listens on, default `127.0.0.1` so other devices on the network cannot reach it. |
+| `ALLOWED_HOSTS` | Extra host names the API answers for (comma-separated). Requests for any other host, and state-changing requests started by other sites, are refused. |
 | `LLM_MOCK_PROVIDER` | `on` to add the offline demo provider. |
 
 `.env` takes precedence over variables already exported in your shell, so a stale key in your

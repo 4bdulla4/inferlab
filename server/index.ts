@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig, type ServerConfig } from "./lib/config";
+import { crossSiteGuard, hostGuard, isLoopbackBind, securityHeaders } from "./lib/security";
 import { HistoryStore } from "./lib/history";
 import { ProviderRegistry } from "./providers/registry";
 import { createLLMRouter } from "./routes/llm";
@@ -47,6 +48,10 @@ fs.watchFile(ENV_PATH, { interval: 1000, persistent: false }, (curr, prev) => {
 
 const app = express();
 app.disable("x-powered-by");
+// Before anything else runs: refuse unknown hosts (DNS rebinding) and requests other sites start.
+app.use(securityHeaders);
+app.use(hostGuard(() => config.allowedHosts));
+app.use(crossSiteGuard(() => config.allowedHosts));
 app.use(express.json({ limit: "256kb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -70,6 +75,7 @@ if (config.isProduction) {
   app.get("*path", (_req, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
-app.listen(config.port, () => {
-  console.log(`[api] listening on http://localhost:${config.port} — ${summary()}`);
+app.listen(config.port, config.host, () => {
+  console.log(`[api] listening on http://${config.host.includes(":") ? `[${config.host}]` : config.host}:${config.port} — ${summary()}`);
+  if (!isLoopbackBind(config.host)) console.warn(`[api] API_HOST=${config.host} exposes this API, and the keys it holds, to other machines. Keep it on 127.0.0.1 unless it sits behind your own authentication.`);
 });

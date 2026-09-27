@@ -4,6 +4,10 @@
  */
 export interface ServerConfig {
   port: number;
+  /** Interface to listen on. Loopback by default, so other devices on the network cannot reach the API. */
+  host: string;
+  /** Host names besides localhost this server answers for (ALLOWED_HOSTS, comma-separated). */
+  allowedHosts: string[];
   anthropic: {
     apiKey: string | undefined;
     model: string;
@@ -36,6 +40,8 @@ function flag(value: string | undefined, defaultValue: boolean): boolean {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   return {
     port: Number(env.API_PORT ?? 8790),
+    host: env.API_HOST?.trim() || "127.0.0.1",
+    allowedHosts: (env.ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean),
     anthropic: {
       apiKey: env.ANTHROPIC_API_KEY?.trim() || undefined,
       model: env.ANTHROPIC_MODEL?.trim() || "claude-opus-5",
