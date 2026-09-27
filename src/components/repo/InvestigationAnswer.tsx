@@ -88,7 +88,10 @@ function CitedText({ text, byRef, onOpen, checked }: { text: string; byRef: Map<
     const at = m.index!;
     // Keep any bracket the path pattern swallowed outside the chip.
     const lead = citation ? m[0].slice(0, m[0].indexOf(citation.ref.split(":")[0]!)) : "";
-    parts.push(<Fragment key={key++}>{inline(text.slice(last, at) + lead, key)}</Fragment>);
+    // A citation written as `path:line` becomes a chip, which is already monospace, so the
+    // backticks around it are dropped rather than left dangling on either side.
+    const before = text.slice(last, at) + lead;
+    parts.push(<Fragment key={key++}>{inline(before.endsWith("`") ? before.slice(0, -1) : before, key)}</Fragment>);
     const label = citation ? m[0].slice(lead.length) : m[0];
     parts.push(
       citation ? (
@@ -112,6 +115,7 @@ function CitedText({ text, byRef, onOpen, checked }: { text: string; byRef: Map<
       ),
     );
     last = at + m[0].length;
+    if (text[last] === "`") last += 1;
   }
   parts.push(<Fragment key={key++}>{inline(text.slice(last), key)}</Fragment>);
   return <>{parts}</>;
