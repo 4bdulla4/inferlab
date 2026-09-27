@@ -9,6 +9,29 @@ export type FileSource = Pick<GitHubClient, "getRawFile">;
 const MAX_FILE_BYTES = 400_000;
 
 /**
+ * Phrases that address an AI reading the file rather than a person. A repository
+ * can plant them to steer the investigator; finding one does not block the
+ * file, it marks it so the agent and the person both see it for what it is.
+ */
+const INJECTION_PATTERNS = [
+  /\b(ignore|disregard|forget|override)\b.{0,40}\b(previous|prior|above|earlier|all|any|your|system)\b.{0,24}\b(instructions?|prompts?|rules?|directions?)\b/i,
+  /\b(reveal|print|output|repeat|show)\b.{0,30}\b(system prompt|your (instructions|prompt|rules))\b/i,
+  /\b(ai|llm|assistant|agent|model)s?\b.{0,20}\b(reading|analy[sz]ing|reviewing|scanning) (this|these)\b/i,
+  /\b(you are now|from now on you|new instructions?:)/i,
+];
+
+/** Line numbers (1-based) that look like instructions aimed at an AI. */
+export function injectionLines(text: string): number[] {
+  const out: number[] = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.slice(0, 400);
+    if (INJECTION_PATTERNS.some((re) => re.test(line))) out.push(i + 1);
+  }
+  return out;
+}
+
+/**
  * The investigator's view of one repository at one commit. Every byte the
  * agent sees passes through here, so the rules live here too, in code:
  * secrets are redacted and live `.env` files are reduced to variable names
@@ -20,6 +43,7 @@ export class RepoWorkspace {
   private readonly paths: Set<string>;
   private readonly seen = new Map<string, [number, number][]>();
   private extraFetches = 0;
+  private readonly flagged = new Map<string, number[]>();
   redactions = 0;
 
   constructor(
@@ -104,10 +128,22 @@ export class RepoWorkspace {
     return [...this.seen.keys()];
   }
 
+  /** Lines of a file that read like instructions to an AI, within start..end. */
+  flaggedLines(path: string, start = 1, end = Number.MAX_SAFE_INTEGER): number[] {
+    return (this.flagged.get(path) ?? []).filter((n) => n >= start && n <= end);
+  }
+
+  /** Files with flagged lines that a tool actually showed the agent. */
+  flaggedSeen(): { path: string; lines: number[] }[] {
+    return [...this.flagged.entries()].map(([path, lines]) => ({ path, lines: lines.filter((n) => this.wasSeen(path, n, n)) })).filter((f) => f.lines.length > 0);
+  }
+
   private clean(path: string, raw: string): string {
     if (isLiveEnvFile(path)) return maskEnvFile(raw);
     const { text, redactions } = redactText(raw);
     this.redactions += redactions;
+    const flagged = injectionLines(text);
+    if (flagged.length) this.flagged.set(path, flagged);
     return text;
   }
 }

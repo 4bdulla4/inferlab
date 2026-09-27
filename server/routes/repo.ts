@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import type { AgentEvent } from "@shared/agent";
 import type { ProviderId } from "@shared/llm";
-import type { AnalyzeEvent, AnalyzeRequestBody, AskRequestBody, InvestigateRequestBody, RepoServiceStatus, SummarizeRequestBody, SummarizeResult, TraceResult } from "@shared/repo";
+import type { AnalyzeEvent, AnalyzeRequestBody, AskRequestBody, InvestigateRequestBody, RepoAnalysis, RepoServiceStatus, SummarizeRequestBody, SummarizeResult, TraceResult } from "@shared/repo";
 import { createAgentModel } from "../agent/models";
 import type { RunOutcome } from "../agent/AgentRunner";
 import type { AgentModel } from "../agent/types";
+import { PRIVATE_DENIED, PrivateRepoAccess } from "../analyzer/access";
 import { AiAnalyzer } from "../analyzer/ai";
 import { analyzeRepository, applySummary } from "../analyzer/analyzer";
 import { AnalysisCache, ContentCache } from "../analyzer/cache";
@@ -21,14 +22,26 @@ import { ProviderNotConfiguredError } from "../providers/types";
 import { sanitize } from "./llm";
 
 const INVESTIGATOR_PROVIDERS: ProviderId[] = ["claude", "openai", "gemini", "mock"];
+/** Each investigation spends a model key for minutes; these cap how many run at once. */
+const MAX_INVESTIGATIONS_PER_CLIENT = 2;
+const MAX_INVESTIGATIONS = 4;
 
 export function createRepoRouter(getConfig: () => ServerConfig, history?: HistoryStore): Router {
   const router = Router();
   const cache = new AnalysisCache();
   const contents = new ContentCache();
   const investigations = new Map<string, AbortController>();
+  const runningByClient = new Map<string, number>();
   let traceCounter = 0;
   let investigationCounter = 0;
+  const access = new PrivateRepoAccess();
+  /** Answers 403 and returns false when this request's token cannot read a private analysis. */
+  const mayRead = async (req: Request, res: Response, analysis: RepoAnalysis): Promise<boolean> => {
+    const { github, githubToken } = clientsFor(req);
+    if (await access.canRead(analysis, github, githubToken)) return true;
+    res.status(403).json({ error: PRIVATE_DENIED });
+    return false;
+  };
   /** Per-request clients: current server config (re-read when .env changes) plus any session keys from the browser. */
   const clientsFor = (req: Request) => {
     const config = getConfig();
@@ -36,6 +49,7 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
     return {
       github: new GitHubClient(keys.github ?? config.github.token),
       ai: new AiAnalyzer({ apiKey: keys.anthropic ?? config.anthropic.apiKey, model: config.anthropic.model, workspaceId: keys.anthropicWorkspace ?? config.anthropic.workspaceId }),
+      githubToken: keys.github ?? config.github.token,
       githubTokenConfigured: Boolean(config.github.token || keys.github),
       session: Boolean(keys.github || keys.anthropic),
     };
@@ -129,6 +143,7 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       res.status(404).json({ error: "Analysis not found or expired. Analyze the repository again." });
       return;
     }
+    if (!(await mayRead(req, res, analysis))) return;
     const { ai } = clientsFor(req);
     if (!ai.status().available) {
       res.status(400).json({ error: "No Anthropic key available. Add one in Settings → API keys or on the server." });
@@ -157,12 +172,13 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
     }
   });
 
-  router.get("/analysis/:id", (req: Request, res: Response) => {
+  router.get("/analysis/:id", async (req: Request, res: Response) => {
     const analysis = cache.get(String(req.params.id));
     if (!analysis) {
       res.status(404).json({ error: "Analysis not found or expired. Analyze the repository again." });
       return;
     }
+    if (!(await mayRead(req, res, analysis))) return;
     res.json(analysis);
   });
 
@@ -181,6 +197,7 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       res.status(404).json({ error: "Analysis not found or expired. Analyze the repository again." });
       return;
     }
+    if (!(await mayRead(req, res, analysis))) return;
     const id = `trace-${++traceCounter}-${Date.now().toString(36)}`;
     const askStartedAt = Date.now();
     const abort = new AbortController();
@@ -233,6 +250,7 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       res.status(404).json({ error: "Analysis not found or expired. Analyze the repository again." });
       return;
     }
+    if (!(await mayRead(req, res, analysis))) return;
     const provider: ProviderId = INVESTIGATOR_PROVIDERS.includes(body.llmProvider as ProviderId) ? (body.llmProvider as ProviderId) : "mock";
     const keys = readSessionKeys(req);
     let model: AgentModel;
@@ -246,6 +264,13 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       }
       throw err;
     }
+
+    const client = req.socket.remoteAddress ?? "unknown";
+    if ((runningByClient.get(client) ?? 0) >= MAX_INVESTIGATIONS_PER_CLIENT || investigations.size >= MAX_INVESTIGATIONS) {
+      res.status(429).json({ error: `Too many investigations are running (at most ${MAX_INVESTIGATIONS_PER_CLIENT} at a time from one browser). Wait for one to finish or stop it.` });
+      return;
+    }
+    runningByClient.set(client, (runningByClient.get(client) ?? 0) + 1);
 
     const runId = `investigate-${++investigationCounter}-${Date.now().toString(36)}`;
     const { github } = clientsFor(req);
@@ -271,6 +296,9 @@ export function createRepoRouter(getConfig: () => ServerConfig, history?: Histor
       if (!abort.signal.aborted) sse.send({ type: "error", at: Date.now(), message: sanitize(err instanceof Error ? err.message : String(err)), retryable: false });
     } finally {
       investigations.delete(runId);
+      const left = (runningByClient.get(client) ?? 1) - 1;
+      if (left > 0) runningByClient.set(client, left);
+      else runningByClient.delete(client);
       sse.end();
       const checked = evidence as { verified: number; total: number } | null;
       console.log(`[repo] investigate ${runId} ${outcome?.reason ?? "error"} in ${Date.now() - startedAt} ms · ${outcome?.toolCalls ?? 0} tool calls · citations ${checked ? `${checked.verified}/${checked.total} verified` : "none"}`);
