@@ -174,7 +174,6 @@ function AgentRunBody({ entry }: { entry: AgentRunEntry }) {
     <>
       <p className="text-[12.5px] text-ink truncate">
         <span className="text-accent-soft">Agent run</span> · <span className="text-ink-dim">{entry.mock ? "offline planner" : entry.vendor}</span>
-        {!entry.mock ? ` · ${entry.model}` : ""}
       </p>
       <p className="mono text-[10.5px] text-muted truncate">{facts.join(" · ")}</p>
     </>
@@ -194,7 +193,6 @@ function RagQueryBody({ entry }: { entry: RagQueryEntry }) {
     <>
       <p className="text-[12.5px] text-ink truncate">
         <span className="text-live">RAG question</span> · <span className="text-ink-dim">{entry.vendor}</span>
-        {entry.model ? ` · ${entry.model}` : ""}
       </p>
       <p className="mono text-[10.5px] text-muted truncate">{facts.join(" · ")}</p>
     </>
@@ -212,7 +210,7 @@ function LlmBody({ entry }: { entry: LlmRunEntry }) {
   return (
     <>
       <p className="text-[12.5px] text-ink truncate">
-        <span className="text-ink-dim">{entry.vendor}</span> · {entry.model}
+        <span className="text-ink">LLM request</span> · <span className="text-ink-dim">{entry.vendor}</span>
       </p>
       <p className="mono text-[10.5px] text-muted truncate">{facts.join(" · ")}</p>
     </>
@@ -241,7 +239,6 @@ function AnalysisBody({ entry, onOpenRepo }: { entry: RepoAnalysisEntry; onOpenR
 function AiBody({ entry }: { entry: RepoAiEntry }) {
   const u = entry.usage;
   const facts = [
-    entry.model,
     entry.source === "heuristic" ? "heuristic tracer" : entry.source ? "AI trace" : null,
     entry.steps ? `${entry.steps} steps` : null,
     entry.confidence ? `confidence ${entry.confidence}` : null,

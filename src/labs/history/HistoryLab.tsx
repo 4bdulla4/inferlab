@@ -3,6 +3,7 @@ import { Clock, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import type { HistoryResponse } from "@shared/history";
 import { clearHistory, fetchHistory } from "@/api/historyClient";
 import { LABS } from "@/labs/registry";
+import { usageByProvider } from "./usage";
 import { formatMs, formatNumber, formatTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useRepoStore } from "@/store/repoStore";
@@ -42,8 +43,9 @@ export function HistoryLab({ onOpenRepoLab }: { onOpenRepoLab: () => void }) {
   };
 
   const stats = data?.stats;
-  // Hoisted: this was recomputed inside the row loop, once per model.
-  const maxModelTokens = useMemo(() => Math.max(1, ...(stats?.models ?? []).map((m) => m.tokens.total)), [stats?.models]);
+  // Usage is shown per provider, not per model id, so the model rows are summed by vendor.
+  const providers = useMemo(() => usageByProvider(stats?.models ?? []), [stats?.models]);
+  const maxProviderTokens = useMemo(() => Math.max(1, ...providers.map((p) => p.tokens.total)), [providers]);
   const upcoming = useMemo(() => LABS.filter((l) => l.status === "coming-soon"), []);
 
   return (
@@ -116,19 +118,19 @@ export function HistoryLab({ onOpenRepoLab }: { onOpenRepoLab: () => void }) {
       </div>
 
       <aside className="grid gap-4 min-w-0 content-start">
-        <GlassPanel title="Model usage" subtitle="tokens by model" bodyClassName="p-4 grid gap-3">
-          {stats && stats.models.length > 0 ? (
+        <GlassPanel title="Model usage" subtitle="tokens by provider" bodyClassName="p-4 grid gap-3">
+          {stats && providers.length > 0 ? (
             <>
               <ul className="grid gap-2">
-                {stats.models.map((m) => {
+                {providers.map((m) => {
                   return (
-                    <li key={m.model} className="grid gap-1 min-w-0">
+                    <li key={m.vendor} className="grid gap-1 min-w-0">
                       <p className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="mono text-[11.5px] text-ink truncate">{m.model}</span>
+                        <span className="mono text-[11.5px] text-ink truncate">{m.vendor}</span>
                         <span className="mono text-[10.5px] text-muted whitespace-nowrap">{m.calls} call{m.calls === 1 ? "" : "s"}</span>
                       </p>
                       <div className="h-1.5 rounded surface-2 overflow-hidden">
-                        <div className="h-full rounded bg-gradient-to-r from-accent to-live" style={{ width: `${(m.tokens.total / maxModelTokens) * 100}%` }} />
+                        <div className="h-full rounded bg-gradient-to-r from-accent to-live" style={{ width: `${(m.tokens.total / maxProviderTokens) * 100}%` }} />
                       </div>
                       <p className="mono text-[10px] text-faint truncate">
                         {formatNumber(m.tokens.input)} in · {formatNumber(m.tokens.output)} out{m.tokens.cacheRead ? ` · ${formatNumber(m.tokens.cacheRead)} cached` : ""}
@@ -203,3 +205,4 @@ function DashboardSkeleton() {
     </div>
   );
 }
+
