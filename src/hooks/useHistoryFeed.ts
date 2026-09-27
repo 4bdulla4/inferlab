@@ -10,15 +10,16 @@ export interface FeedItem {
   at: number;
 }
 
-function describe(e: HistoryEntry): FeedItem {
+/** One line of the notification menu. It names the provider, never the model id. */
+export function describeEntry(e: HistoryEntry): FeedItem {
   const base = { id: e.id, ok: e.ok, at: e.at };
-  if (e.kind === "llm_run") return { ...base, title: `${e.vendor} · ${e.model}`, detail: e.ok ? `${e.finishReason ?? "done"}${e.totalTokens ? ` · ${e.totalTokens} tokens` : ""}` : (e.error ?? "failed") };
+  if (e.kind === "llm_run") return { ...base, title: `LLM request · ${e.vendor}`, detail: e.ok ? `${e.finishReason ?? "done"}${e.totalTokens ? ` · ${e.totalTokens} tokens` : ""}` : (e.error ?? "failed") };
   if (e.kind === "repo_analysis") return { ...base, title: e.repo, detail: e.ok ? `${e.filesScanned} files · ${e.nodes} modules` : (e.error ?? "failed") };
   if (e.kind === "repo_summarize") return { ...base, title: `AI summaries · ${e.repo}`, detail: e.ok ? `${e.usage?.outputTokens ?? 0} tokens out` : (e.error ?? "failed") };
   if (e.kind === "rag_ingest") return { ...base, title: `RAG · ${e.docName}`, detail: e.ok ? `${e.chunks} chunks · ${e.embeddingModel}` : (e.error ?? "failed") };
-  if (e.kind === "rag_query") return { ...base, title: `RAG question · ${e.model ?? e.llmProvider}`, detail: e.ok ? `${e.retrieved} retrieved · ${e.strategy}${e.totalTokens ? ` · ${e.totalTokens} tokens` : ""}` : (e.error ?? "failed") };
+  if (e.kind === "rag_query") return { ...base, title: `RAG question · ${e.vendor}`, detail: e.ok ? `${e.retrieved} retrieved · ${e.strategy}${e.totalTokens ? ` · ${e.totalTokens} tokens` : ""}` : (e.error ?? "failed") };
   if (e.kind === "ml_run") return { ...base, title: `ML · ${e.algorithm.replace(/_/g, " ")}`, detail: e.ok ? `${e.datasetName} · ${e.headlineMetric ? `${e.headlineMetric.name} ${e.headlineMetric.value.toFixed(3)}` : "trained"}` : (e.error ?? "failed") };
-  if (e.kind === "agent_run") return { ...base, title: `Agent · ${e.mock ? "offline planner" : e.model}`, detail: e.ok ? `${e.reason.replace(/_/g, " ")} · ${e.iterations} iteration${e.iterations === 1 ? "" : "s"} · ${e.toolCalls} tool call${e.toolCalls === 1 ? "" : "s"}` : (e.error ?? "failed") };
+  if (e.kind === "agent_run") return { ...base, title: `Agent · ${e.mock ? "offline planner" : e.vendor}`, detail: e.ok ? `${e.reason.replace(/_/g, " ")} · ${e.iterations} iteration${e.iterations === 1 ? "" : "s"} · ${e.toolCalls} tool call${e.toolCalls === 1 ? "" : "s"}` : (e.error ?? "failed") };
   return { ...base, title: e.question ?? "Question", detail: `${e.repo} · ${e.steps ?? 0} steps` };
 }
 
@@ -31,7 +32,7 @@ export function useHistoryFeed(active: boolean) {
   const load = useCallback(async () => {
     try {
       const data = await fetchHistory(12);
-      const items = data.entries.map(describe);
+      const items = data.entries.map(describeEntry);
       setEntries(items);
       setUnread(items.filter((i) => i.at > seenAt.current).length);
     } catch {
