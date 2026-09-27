@@ -20,7 +20,7 @@ export class ClaudeAgentModel implements AgentModel {
       model: this.model,
       max_tokens: req.maxOutputTokens,
       system: req.system,
-      messages: toClaudeMessages(req.messages),
+      messages: withCacheBreakpoint(toClaudeMessages(req.messages)),
     };
     if (req.tools.length > 0 && !req.forceText) {
       params.tools = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema as Anthropic.Tool.InputSchema }));
@@ -49,13 +49,19 @@ export class ClaudeAgentModel implements AgentModel {
       .filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")
       .map((b) => ({ id: b.id, name: b.name, args: (b.input ?? {}) as Record<string, unknown> }));
     const finalText = text || final.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
+    // Anthropic's input_tokens excludes the cached part of the prompt. The lab's
+    // input count means the whole prompt, as OpenAI reports it, so token budgets
+    // and totals mean the same thing whichever provider ran; the cache split is kept.
+    const cacheRead = final.usage.cache_read_input_tokens ?? 0;
+    const cacheWrite = final.usage.cache_creation_input_tokens ?? 0;
+    const promptTokens = final.usage.input_tokens + cacheRead + cacheWrite;
     return {
       text: finalText,
       toolCalls,
       usage: {
-        inputTokens: final.usage.input_tokens,
+        inputTokens: promptTokens,
         outputTokens: final.usage.output_tokens,
-        totalTokens: final.usage.input_tokens + final.usage.output_tokens,
+        totalTokens: promptTokens + final.usage.output_tokens,
         cacheReadTokens: final.usage.cache_read_input_tokens ?? null,
         cacheWriteTokens: final.usage.cache_creation_input_tokens ?? null,
       },
@@ -86,4 +92,20 @@ function toClaudeMessages(messages: AgentMessage[]): Anthropic.MessageParam[] {
     }
   }
   return out;
+}
+
+/**
+ * Marks the end of the conversation as a cache breakpoint. Each agent round
+ * resends everything before it, so the next round reads that prefix (tools,
+ * instructions and earlier turns) from the cache instead of paying for it again.
+ * Prefixes shorter than the model's minimum are simply not cached.
+ */
+export function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+  const blocks: Anthropic.ContentBlockParam[] = typeof last.content === "string" ? [{ type: "text", text: last.content }] : [...last.content];
+  const tail = blocks[blocks.length - 1];
+  if (!tail || tail.type === "thinking" || tail.type === "redacted_thinking") return messages;
+  blocks[blocks.length - 1] = { ...tail, cache_control: { type: "ephemeral" } } as Anthropic.ContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
 }
