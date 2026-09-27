@@ -3,7 +3,7 @@ import type { AgentEvent, AgentToolDescriptor } from "@shared/agent";
 import type { EventStatus } from "@/types/execution";
 import { PACE } from "@/labs/llm/sequencer";
 import type { AgentEventDataMap, AgentEventType, AgentLabEvent, AnyAgentEvent } from "./events";
-import { AGENT_NODES, type AgentNodeKind } from "./stages";
+import { AGENT_NODES, providerLabel, type AgentNodeKind } from "./stages";
 
 /** Base dwell per event type at 1x, before the shared pace multiplier. */
 const DURATION: Record<AgentEventType, number> = {
@@ -83,7 +83,7 @@ export class AgentEventSequencer {
       case "agent_initialized":
         this.mock = ev.mock;
         for (const t of ev.tools) this.tools.set(t.name, t);
-        return [this.make("AGENT_INITIALIZED", "init", NODE_IDS.init, "completed", ev.mock ? "simulation" : "live", { provider: ev.provider, model: ev.model, vendor: ev.vendor, mock: ev.mock, tools: ev.tools }, `${ev.model} · ${ev.tools.length} tools`, ev.at)];
+        return [this.make("AGENT_INITIALIZED", "init", NODE_IDS.init, "completed", ev.mock ? "simulation" : "live", { provider: ev.provider, model: ev.model, vendor: ev.vendor, mock: ev.mock, tools: ev.tools }, `${providerLabel(ev.provider, ev.mock)} · ${ev.tools.length} tools`, ev.at)];
       case "system_instructions":
         return [this.make("INSTRUCTIONS_SET", "instructions", NODE_IDS.instructions, "completed", "live", { text: ev.text, tokenEstimate: ev.tokenEstimate }, `${ev.tokenEstimate} tokens of instructions`, ev.at)];
       case "context_loaded":

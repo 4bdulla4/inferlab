@@ -286,3 +286,18 @@ describe("evidence check", () => {
     expect(state.edges.some((e) => e.from === NODE_IDS.response && e.to === NODE_IDS.done)).toBe(true);
   });
 });
+
+describe("agent initialization node", () => {
+  it("names the provider, never the model id", () => {
+    const seq = new AgentEventSequencer("run");
+    const events = script().flatMap((e) => seq.fromServer(e));
+    const init = events.find((e) => e.type === "AGENT_INITIALIZED")!;
+    expect(init.label).toBe("Claude · 3 tools");
+    const { state } = play(script());
+    const node = state.nodes.find((n) => n.id === NODE_IDS.init)!;
+    expect(node.sublabel).toBe("Claude · 3 tools");
+    expect(JSON.stringify([init.label, node.sublabel])).not.toContain("claude-opus");
+    const offline = play(script(true)).state.nodes.find((n) => n.id === NODE_IDS.init)!;
+    expect(offline.sublabel).toBe("offline planner · 3 tools");
+  });
+});

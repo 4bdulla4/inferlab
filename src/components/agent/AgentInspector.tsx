@@ -4,7 +4,7 @@ import type { DataSource } from "@shared/llm";
 import type { AgentStateSnapshot, MessageSummary } from "@shared/agent";
 import type { NodeState } from "@/types/execution";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { AGENT_NODES, AGENT_STATUS_LABEL, TOOL_CATEGORY_LABEL } from "@/labs/agent/stages";
+import { AGENT_NODES, AGENT_STATUS_LABEL, TOOL_CATEGORY_LABEL, providerLabel } from "@/labs/agent/stages";
 import type { AgentGraphNode, AgentRunState, AgentVisualState, ToolCallInfo } from "@/labs/agent/state";
 import { cn } from "@/lib/cn";
 import { formatMs, formatNumber } from "@/lib/format";
@@ -169,8 +169,7 @@ function NodeFacts({ node, visual: v, call }: { node: AgentGraphNode; visual: Ag
       push("parallel tool calls", v.config ? (v.config.parallelToolCalls ? "allowed" : "one at a time") : undefined);
       break;
     case "init":
-      push("provider", v.agent?.vendor);
-      push("model", v.agent?.model);
+      push("provider", v.agent ? providerLabel(v.agent.provider, v.agent.mock) : undefined);
       push("planner", v.agent?.mock ? "offline demo (simulation)" : "real model");
       push("tools offered", v.agent?.tools.length);
       v.agent?.tools.forEach((t) => push(t.name, `${TOOL_CATEGORY_LABEL[t.category]} · ${t.source}`));
@@ -316,8 +315,8 @@ function StepDetail({ node, visual: v, call }: { node: AgentGraphNode; visual: A
       return v.agent ? (
         <div className="grid gap-2">
           <div className="grid grid-cols-2 gap-2">
-            <Tile label="provider" value={v.agent.vendor} />
-            <Tile label="model" value={v.agent.model} />
+            <Tile label="provider" value={providerLabel(v.agent.provider, v.agent.mock)} />
+            <Tile label="tools" value={String(v.agent.tools.length)} />
           </div>
           {v.agent.mock ? <p className="rounded-md border border-sim/40 bg-sim/[0.06] px-2.5 py-1.5 text-[11.5px] text-sim">Offline demo: a scripted planner picks the tools. Everything it says about itself is a simulation; the tools it calls are real.</p> : null}
           <Block label={`tools offered to the model (${v.agent.tools.length})`}>

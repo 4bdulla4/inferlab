@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { EvidenceCitation } from "@shared/agent";
 import type { RepoAnalysis } from "@shared/repo";
+import { providerLabel } from "@/labs/agent/stages";
 import type { AgentRunState } from "@/labs/agent/state";
 import { cn } from "@/lib/cn";
 import { formatMs, formatNumber } from "@/lib/format";
@@ -8,8 +9,6 @@ import { useRepoStore } from "@/store/repoStore";
 import { SourceBadge } from "@/components/layout/SourceBadge";
 import { Badge } from "@/components/ui/Badge";
 import { EvidenceList, evidenceSummary } from "@/components/agent/EvidenceList";
-
-const PROVIDER_NAME: Record<string, string> = { claude: "Claude", openai: "OpenAI", gemini: "Gemini" };
 
 /** Same shape the server's checker reads, so the two agree on what a citation is. */
 const CITATION = /([\w@.~+\-[\]()/]+):(\d{1,6})(?:\s*[-–]\s*(\d{1,6}))?/g;
@@ -37,7 +36,7 @@ export function InvestigationAnswer({ run, analysis }: { run: AgentRunState; ana
       <div className={cn("rounded-lg border p-3 grid gap-2 min-w-0", v.final?.source === "simulation" ? "border-sim/30 bg-sim/[0.05]" : "border-accent/25 bg-accent/[0.04]")}>
         <div className="flex flex-wrap items-center gap-2">
           <SourceBadge source={v.agent?.mock ? "simulation" : "live"} />
-          <span className="mono text-[10.5px] text-muted">{v.agent ? (v.agent.mock ? "offline planner" : PROVIDER_NAME[v.agent.provider] ?? v.agent.vendor) : "starting…"}</span>
+          <span className="mono text-[10.5px] text-muted">{v.agent ? providerLabel(v.agent.provider, v.agent.mock) : "starting…"}</span>
           {v.completion ? (
             <span className="mono text-[10.5px] text-faint">
               {v.completion.iterations} rounds · {v.completion.toolCalls} tool calls · {formatMs(v.completion.totalMs)} · {formatNumber(v.completion.usage.totalTokens)} tokens

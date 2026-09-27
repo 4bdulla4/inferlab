@@ -1,7 +1,7 @@
 import type { NodeState } from "@/types/execution";
 import { formatMs } from "@/lib/format";
 import type { AgentEventType, AgentLabEvent, AnyAgentEvent } from "./events";
-import { AGENT_NODES, type AgentNodeKind } from "./stages";
+import { AGENT_NODES, providerLabel, type AgentNodeKind } from "./stages";
 import type { AgentGraphEdge, AgentGraphNode, AgentTimelineEntry, AgentVisualState, ToolCallInfo } from "./state";
 
 /**
@@ -44,7 +44,7 @@ const GRAPH_HANDLERS: GraphHandlers = {
   AGENT_INITIALIZED: (s, event) => {
     const d = event.data;
     return {
-      ...addNode(s, { id: d.nodeId, kind: "init", label: AGENT_NODES.init.label, sublabel: `${d.model} · ${d.tools.length} tool${d.tools.length === 1 ? "" : "s"}` }, lastNodeId(s)),
+      ...addNode(s, { id: d.nodeId, kind: "init", label: AGENT_NODES.init.label, sublabel: `${providerLabel(d.provider, d.mock)} · ${d.tools.length} tool${d.tools.length === 1 ? "" : "s"}` }, lastNodeId(s)),
       agent: { provider: d.provider, model: d.model, vendor: d.vendor, mock: d.mock, tools: d.tools },
     };
   },

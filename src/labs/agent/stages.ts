@@ -125,6 +125,13 @@ export const AGENT_NODES: Record<AgentNodeKind, AgentNodeDefinition> = {
   },
 };
 
+const PROVIDER_LABEL: Record<string, string> = { claude: "Claude", openai: "OpenAI", gemini: "Gemini" };
+
+/** The provider's name for page chrome; the model id itself is not shown. */
+export function providerLabel(provider: string, mock: boolean): string {
+  return mock ? "offline planner" : (PROVIDER_LABEL[provider] ?? provider);
+}
+
 /** How the observable phases read in the state panel. */
 export const AGENT_STATUS_LABEL: Record<AgentStatus, string> = {
   initializing: "Initializing",
