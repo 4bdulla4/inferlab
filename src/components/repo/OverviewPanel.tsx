@@ -45,7 +45,7 @@ export function OverviewPanel({ analysis }: { analysis: RepoAnalysis }) {
         <div className="rounded-lg border border-sim/30 bg-sim/[0.05] p-3 grid gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <EvidenceBadge kind="ai" compact />
-            <span className="mono text-[10.5px] text-muted">model-written summary · {analysis.ai.model}</span>
+            <span className="mono text-[10.5px] text-muted">model-written summary</span>
             {analysis.ai.usage ? <span className="mono text-[10.5px] text-faint">· tokens {formatUsage(analysis.ai.usage)}</span> : null}
           </div>
           <p className="text-[13px] leading-relaxed text-ink-dim">{analysis.overview.aiOverview}</p>
@@ -55,7 +55,7 @@ export function OverviewPanel({ analysis }: { analysis: RepoAnalysis }) {
           <Button size="sm" variant="outline" icon={summarizing ? <Loader2 className="animate-spin" /> : <Sparkles />} disabled={summarizing} onClick={() => void runSummaries()}>
             {summarizing ? "Summarizing…" : "Generate AI summaries"}
           </Button>
-          <span className="mono text-[10.5px] text-muted">one model call (~15k input tokens) · adds a role description to every module · {analysis.ai.model}</span>
+          <span className="mono text-[10.5px] text-muted">one model call (~15k input tokens) · adds a role description to every module</span>
           {summarizeError ? <span className="text-[11.5px] text-err w-full">{summarizeError}</span> : null}
         </div>
       ) : (

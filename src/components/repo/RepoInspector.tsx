@@ -111,7 +111,7 @@ function NodeDetail({ analysis, nodeId }: { analysis: RepoAnalysis; nodeId: stri
         </div>
         {node.aiSummary ? (
           <div className="rounded-lg border border-sim/30 bg-sim/[0.05] p-3 grid gap-1">
-            <div className="flex items-center gap-2"><EvidenceBadge kind="ai" compact /><span className="mono text-[10.5px] text-muted">role in the product · {analysis.ai.model}</span></div>
+            <div className="flex items-center gap-2"><EvidenceBadge kind="ai" compact /><span className="mono text-[10.5px] text-muted">role in the product</span></div>
             <p className="text-[12.5px] text-ink-dim leading-relaxed">{node.aiSummary}</p>
           </div>
         ) : mode === "advanced" ? (

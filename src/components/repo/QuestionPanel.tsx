@@ -55,7 +55,7 @@ export function QuestionPanel({ className }: { className?: string }) {
   return (
     <GlassPanel
       title="Ask about this product"
-      subtitle={analysis ? (analysis.ai.available ? `answers: AI-inferred (${analysis.ai.model}) · steps checked against the index` : "answers: heuristic tracer (no model key)") : undefined}
+      subtitle={analysis ? (analysis.ai.available ? "answers: AI-inferred · steps checked against the index" : "answers: heuristic tracer (no model key)") : undefined}
       className={className}
       bodyClassName="p-4 grid gap-3 overflow-y-auto panel-scroll content-start"
     >
@@ -109,7 +109,6 @@ export function QuestionPanel({ className }: { className?: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <EvidenceBadge kind={trace.source === "ai" ? "ai" : "heuristic"} />
               <Badge tone={trace.confidence === "high" ? "ok" : trace.confidence === "medium" ? "warn" : "err"}>confidence {trace.confidence}</Badge>
-              {trace.model ? <span className="mono text-[10.5px] text-muted">{trace.model}</span> : null}
               {trace.usage ? <span className="mono text-[10.5px] text-faint">tokens {formatUsage(trace.usage)}</span> : null}
             </div>
             <p className="text-[13px] leading-relaxed text-ink">{trace.answer}</p>

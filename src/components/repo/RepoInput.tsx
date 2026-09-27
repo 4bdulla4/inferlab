@@ -73,7 +73,7 @@ export function RepoInput() {
               >
                 <Badge tone={service.githubTokenConfigured ? "ok" : "neutral"} className="cursor-pointer hover:border-line-strong">{service.githubTokenConfigured ? "github token" : "anonymous github · add token"}</Badge>
               </button>
-              <Badge tone={service.ai.available ? "sim" : "neutral"}>{service.ai.available ? `ai · ${service.ai.model}` : "ai off"}</Badge>
+              <Badge tone={service.ai.available ? "sim" : "neutral"}>{service.ai.available ? "ai on" : "ai off"}</Badge>
             </>
           ) : null}
         </span>
