@@ -141,11 +141,23 @@ export function QuestionPanel({ className }: { className?: string }) {
         <div className="flex flex-wrap items-center gap-2">
           {mode === "investigate" ? (
             investigating && run ? (
-              <Button type="button" variant="danger" size="md" icon={<Square />} onClick={() => agentRuntime.stop(run.id)}>
+              // Own key and preventDefault: stopping swaps this for the submit button, which
+              // must not receive the same click and start a new investigation.
+              <Button
+                key="stop"
+                type="button"
+                variant="danger"
+                size="md"
+                icon={<Square />}
+                onClick={(e) => {
+                  e.preventDefault();
+                  agentRuntime.stop(run.id);
+                }}
+              >
                 Stop the agent
               </Button>
             ) : (
-              <Button type="submit" variant="primary" size="md" icon={<Bot />} disabled={!analysis || !question.trim() || rescanning}>
+              <Button key="investigate" type="submit" variant="primary" size="md" icon={<Bot />} disabled={!analysis || !question.trim() || rescanning}>
                 Investigate
               </Button>
             )

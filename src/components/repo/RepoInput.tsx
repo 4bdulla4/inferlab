@@ -47,7 +47,10 @@ export function RepoInput() {
     }
   };
 
-  const stop = () => {
+  const stop = (e: React.MouseEvent) => {
+    // Stopping swaps this button for ANALYZE, a submit button. Without this the
+    // browser would finish the click on the new button and start a fresh scan.
+    e.preventDefault();
     activeAbort?.abort();
     useRepoStore.getState().failAnalysis("Analysis cancelled.");
   };
@@ -101,11 +104,13 @@ export function RepoInput() {
           />
         </label>
         {analyzing ? (
-          <Button type="button" size="lg" variant="danger" icon={<Square />} onClick={stop}>
+          // Distinct keys: React must not reuse one <button> for both, or the click that
+          // stops the scan lands on a submit button and restarts it.
+          <Button key="stop" type="button" size="lg" variant="danger" icon={<Square />} onClick={stop}>
             STOP
           </Button>
         ) : (
-          <Button type="submit" size="lg" variant="primary" icon={<Search />} disabled={!url.trim()} className="min-w-[140px]">
+          <Button key="analyze" type="submit" size="lg" variant="primary" icon={<Search />} disabled={!url.trim()} className="min-w-[140px]">
             ANALYZE
           </Button>
         )}
